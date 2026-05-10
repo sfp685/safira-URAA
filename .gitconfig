@@ -1,0 +1,9 @@
+[user]
+	name = Safira
+	email = safirafebriani64@gmail.com\n
+[init]
+	defaultBranch = main
+[core]
+	autocrlf = input
+[pull]
+	rebase = false
