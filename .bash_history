@@ -1354,3 +1354,47 @@ git log --oneline -5
 test -f build/meta/toolchain-versions.txt
 make check-scripts
 find . -name "Makefile"
+./tools/scripts/m2_preflight.sh
+/mnt/c.
+./tools/scripts/m2_preflight.sh
+pwd
+pwd case "$(pwd)" in /mnt/c/*|/mnt/d/*|/mnt/e/*) echo "ERROR: repository berada di filesystem Windows. Pindahkan ke ~/src/mcsos." exit 1 ;; *) echo "OK: repository berada di filesystem Linux WSL." ;; esac
+case "$(pwd)" in   /mnt/c/*|/mnt/d/*|/mnt/e/*)     echo "ERROR: repository berada di filesystem Windows. Pindahkan ke ~/src/mcsos.";     exit 1;     ;;   *)     echo "OK: repository berada di filesystem Linux WSL.";     ;; esac
+git rev-parse --show-toplevel git status --short git branch --show-current git log --oneline -5
+git rev-parse --show-toplevel
+git status --short
+git branch --show-current
+git log --oneline -5
+git add .
+git commit -m "Menambahkan file yang belum terlacak"
+./tools/scripts/m2_preflight.sh
+ls tools/scripts
+pwd
+cd ~/src/mcsos
+git status
+git add .
+git commit -m "Menambahkan dan memodifikasi file untuk praktikum M2"
+./tools/scripts/m2_preflight.sh
+git rev-parse --show-toplevel
+git status --short
+git branch --show-current
+git log --oneline -5
+build/ iso_root/ *.iso *.img *.elf *.map *.o *.d third_party/limine/
+mkdir -p build/iso_root
+make image
+nano Makefile
+make image
+nano makefile
+make image
+make clean
+make image
+nano makefile
+make image
+case "$(pwd)" in   /mnt/c/*|/mnt/d/*|/mnt/e/*)     echo "ERROR: repository berada di filesystem Windows. Pindahkan ke ~/src/mcsos.";     exit 1;   ;;   *)     echo "OK: repository berada di filesystem Linux WSL.";   ;; esac
+./tools/scripts/m2_preflight.sh
+ls tools/sripts
+./tools/scripts/fetch_limine.sh
+ls -r
+./tools/scripts/fetch_limine.sh
+git clone https://github.com/username/repository.git
+cd repository
