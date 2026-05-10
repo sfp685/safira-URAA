@@ -1306,3 +1306,51 @@ make distclean
 make build
 make image
 make run
+case "$(pwd)" in /mnt/c/*|/mnt/d/*|/mnt/e/*) echo "ERROR: repository berada di filesystem Windows. Pindahkan ke ~/src/mcsos."; exit 1; ;; *) echo "OK: repository berada di filesystem Linux WSL."; ;; esac
+git status --short
+git add .
+git commit -m "Menambahkan file yang belum terlacak"
+test -f docs/architecture/overview.md
+test -f docs/security/threat_model.md
+test -f build/meta/toolchain-versions.txt
+test -f build/proof/freestanding_probe.o
+test -f build/mcsos.iso
+test -f build/kernel.elf
+test -f build/kernel.map
+#ifndef MCSOS_ARCH_IO_H
+#define MCSOS_ARCH_IO_H
+#include <stdint.h>
+static inline void outb(uint16_t port, uint8_t value) {
+}
+static inline uint8_t inb(uint16_t port) {
+}
+static inline void io_wait(void) {
+}
+#endif
+#include <stdint.h>  // Untuk tipe data uint8_t dan uint16_t
+// Fungsi untuk menulis byte ke port I/O
+static inline void outb(uint16_t port, uint8_t value) {
+}
+// Fungsi untuk membaca byte dari port I/O
+static inline uint8_t inb(uint16_t port) {
+}
+make distclean
+make build
+#include <stdint.h>  // Untuk tipe data uint8_t dan uint16_t
+// Fungsi untuk menulis byte ke port I/O
+static inline void outb(uint16_t port, uint8_t value) {
+}
+// Fungsi untuk membaca byte dari port I/O
+static inline uint8_t inb(uint16_t port) {
+}
+make distclean
+make build
+pwd
+case "$(pwd)" in /mnt/c/*|/mnt/d/*|/mnt/e/*)   echo "ERROR: repository berada di filesystem Windows. Pindahkan ke ~/src/mcsos.";   exit 1; ;; *)   echo "OK: repository berada di filesystem Linux WSL."; ;; esac
+git rev-parse --show-toplevel
+git status --short
+git branch --show-current
+git log --oneline -5
+test -f build/meta/toolchain-versions.txt
+make check-scripts
+find . -name "Makefile"
