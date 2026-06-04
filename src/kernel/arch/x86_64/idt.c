@@ -40,3 +40,5 @@ void x86_64_idt_init(void) {
     // Cetak log sukses ke serial console
     klog_info("[M4] IDT loaded successfully with 32 exception stubs.\n");
 }
+
+void idt_init(void) { x86_64_idt_init(); }
