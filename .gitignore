@@ -1,0 +1,11 @@
+build/
+iso_root/
+bin/
+*.o
+*.iso
+*.elf
+*.map
+.ssh/
+.wget-hsts
+kmain.o
+mcsos/build/
