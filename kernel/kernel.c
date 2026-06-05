@@ -61,10 +61,35 @@ static void kernel_memory_init(void) {
     }
 }
 
+#include "mcsos/kmem.h"
+
+#define M8_BOOT_HEAP_SIZE (64u * 1024u)
+static unsigned char m8_boot_heap[M8_BOOT_HEAP_SIZE] __attribute__((aligned(4096)));
+
 void kernel_main(void) {
     serial_init();
     idt_init();
     kernel_memory_init();
+
+    /* M8: kernel heap bootstrap */
+    int rc = kmem_init(m8_boot_heap, sizeof(m8_boot_heap));
+    if (rc != 0) {
+        serial_write_string("[M8 FAIL] kmem_init failed\n");
+        for (;;) asm volatile ("hlt");
+    }
+    serial_write_string("[M8] heap initialized\n");
+
+    void *probe = kmem_alloc(128);
+    if (probe == (void*)0) {
+        serial_write_string("[M8 FAIL] kmem_alloc probe failed\n");
+        for (;;) asm volatile ("hlt");
+    }
+    if (kmem_free_checked(probe) != 0) {
+        serial_write_string("[M8 FAIL] kmem_free_checked failed\n");
+        for (;;) asm volatile ("hlt");
+    }
+    serial_write_string("[M8 SUCCESS] kernel heap alloc/free probe OK\n");
+
     asm volatile ("sti");
     for (;;) asm volatile ("hlt");
 }
