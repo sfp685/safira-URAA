@@ -9,3 +9,6 @@ bin/
 .wget-hsts
 kmain.o
 mcsos/build/
+.ssh/
+.ssh/
+.ssh/
