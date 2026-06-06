@@ -9,4 +9,11 @@ static inline void kernel_panic_at(const char* file, int line, const char* msg) 
     }
 }
 
+
+#define KERNEL_ASSERT(expr) do { \
+    if (!(expr)) { \
+        kernel_panic_at(__FILE__, __LINE__, #expr); \
+    } \
+} while (0)
+
 #endif

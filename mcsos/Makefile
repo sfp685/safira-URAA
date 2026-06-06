@@ -53,3 +53,55 @@ m9-audit: m9-freestanding
 
 m9-clean:
 	rm -rf $(BUILD_M9)
+
+# ================================================================
+# M9 - Kernel ELF build (Multiboot + scheduler)
+# ================================================================
+KERNEL_ELF   := build/m9/kernel_m9.elf
+KERNEL_CFLAGS := -target x86_64-unknown-none-elf -std=c17 \
+				 -ffreestanding -fno-stack-protector -fno-pic \
+				 -mno-red-zone -Wall -Wextra -Werror \
+				 -Iinclude -Ikernel/arch/x86_64/include -Imcsos -I.
+
+.PHONY: m9-kernel m9-qemu
+
+m9-kernel: $(BUILD_M9)
+	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c src/kernel/arch/x86_64/boot.s -o $(BUILD_M9)/boot.o
+	clang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/idt.c   -o $(BUILD_M9)/idt_src.o
+	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c src/kernel/arch/x86_64/isr.s -o $(BUILD_M9)/isr.o
+	clang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/stubs.c -o $(BUILD_M9)/stubs.o
+	clang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/trap.c  -o $(BUILD_M9)/trap_src.o
+	clang $(KERNEL_CFLAGS) -c kernel/arch/x86_64/idt.c       -o $(BUILD_M9)/idt_kern.o
+	clang $(KERNEL_CFLAGS) -c kernel/core/trap.c             -o $(BUILD_M9)/trap_kern.o
+	clang $(KERNEL_CFLAGS) -c kernel/kmain.c                 -o $(BUILD_M9)/kmain.o
+	clang $(KERNEL_CFLAGS) -c kernel/mcsos_thread.c          -o $(BUILD_M9)/mcsos_thread.o
+	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o
+	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c kernel/arch/x86_64/isr.S -o $(BUILD_M9)/isr_kern.o
+	ld.lld -T linker.ld --no-dynamic-linker $(BUILD_M9)/boot.o $(BUILD_M9)/idt_src.o $(BUILD_M9)/isr.o $(BUILD_M9)/stubs.o $(BUILD_M9)/trap_src.o $(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o $(BUILD_M9)/mcsos_thread.o $(BUILD_M9)/context_switch.o $(BUILD_M9)/isr_kern.o -o $(KERNEL_ELF)
+	echo "Kernel ELF built: $(KERNEL_ELF)"
+
+m9-qemu: m9-kernel
+	qemu-system-x86_64 -kernel $(KERNEL_ELF) -serial stdio -display none -no-reboot -m 128M
+
+# ================================================================
+# M9 - ISO + QEMU via GRUB
+# ================================================================
+ISO_DIR := build/m9/iso
+KERNEL_ISO := build/m9/kernel_m9.iso
+
+.PHONY: m9-iso m9-qemu-iso
+
+m9-iso: m9-kernel
+	mkdir -p $(ISO_DIR)/boot/grub
+	cp $(KERNEL_ELF) $(ISO_DIR)/boot/kernel_m9.elf
+	printf 'set timeout=0\nset default=0\nmenuentry "MCSOS M9" {\n  multiboot2 /boot/kernel_m9.elf\n  boot\n}\n' > $(ISO_DIR)/boot/grub/grub.cfg
+	grub-mkrescue -o $(KERNEL_ISO) $(ISO_DIR) 2>&1
+	echo "ISO built: $(KERNEL_ISO)"
+
+m9-qemu-iso: m9-iso
+	qemu-system-x86_64 \
+	  -cdrom $(KERNEL_ISO) \
+	  -serial stdio \
+	  -display none \
+	  -no-reboot \
+	  -m 128M

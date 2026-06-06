@@ -1,73 +1,3 @@
-
-// Mock struct agar bisa dites di host
-struct limine_memmap_entry {
-    uint64_t base;
-    uint64_t length;
-    uint64_t type;
-};
-
-int main() {
-    printf("M6 PMM host unit test: RUNNING\n");
-    
-    // Uji inisialisasi PMM di sini
-    // Pastikan logika bitmap_set dan bitmap_clear berjalan
-    
-    printf("M6 PMM host unit test: PASS\n");
-    return 0;
-}
-EOF
-
-clang -o build/test_pmm_host tests/test_pmm_host.c src/pmm.c -Iinclude -Ilimine
-./build/test_pmm_host
-mkdir -p tests
-cat << 'EOF' > tests/test_pmm_host.c
-#include <stdio.h>
-#include <assert.h>
-#include "../src/pmm.h"
-
-int main() {
-    printf("M6 PMM host unit test: RUNNING\n");
-    // Tes sederhana: pastikan tidak crash
-    printf("M6 PMM host unit test: PASS\n");
-    return 0;
-}
-EOF
-
-clang -o build/test_pmm_host tests/test_pmm_host.c src/pmm.c -Iinclude -Ilimine
-./build/test_pmm_host
-// Di dalam kernel_main
-void kernel_main(struct limine_framebuffer_request *fb_req, struct limine_memmap_request *memmap_req) {
-}
-# Hapus file yang bermasalah (hati-hati, ini akan mereset kernel.c Anda ke bentuk dasar)
-rm kernel/kernel.c
-# Buat ulang kernel.c dengan isi yang benar dan bersih
-cat << 'EOF' > kernel/kernel.c
-#include <io.h>
-#include "../src/pmm.h"
-
-void kernel_main(struct limine_framebuffer_request *fb_req, struct limine_memmap_request *memmap_req) {
-    serial_init();
-    idt_init();
-
-    // Inisialisasi PMM sesuai panduan M6
-    pmm_init(memmap_req->response);
-
-    asm volatile ("sti");
-
-    // Loop utama kernel agar tidak crash
-    for (;;) {
-        asm volatile ("hlt");
-    }
-}
-EOF
-
-# Menampilkan isi makefile untuk memastikan baris objek sudah benar
-cat makefile
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
 KERNEL := $(BUILD_DIR)/kernel.elf
 MAP := $(BUILD_DIR)/kernel.map
 CC := clang
@@ -1998,3 +1928,73 @@ make && cp build/kernel.elf iso_root/boot/kernel.elf && xorriso -as mkisofs   -b
 git add kernel/kernel.c
 git commit -m "M8: integrate heap bootstrap into kernel_main, QEMU log OK"
 git log --oneline -4
+mkdir -p include kernel arch/x86_64 tests evidence/m9 build/m9
+git add .
+git commit -m "checkpoint before M9 scheduler" || true
+git switch -c m9-kernel-thread-scheduler
+#ifndef MCSOS_THREAD_H
+#define MCSOS_THREAD_H
+#include <stddef.h>
+#include <stdint.h>
+#define MCSOS_THREAD_MAGIC    UINT64_C(0x4d43534f53544852)
+#define MCSOS_THREAD_NAME_MAX 32u
+#define MCSOS_STACK_ALIGN     16u
+#define MCSOS_MIN_KERNEL_STACK 4096u
+typedef enum mcsos_thread_state {
+} mcsos_thread_state_t;
+typedef enum mcsos_sched_result {
+} mcsos_sched_result_t;
+typedef void (*mcsos_thread_entry_t)(void *arg);
+typedef struct mcsos_context {
+} mcsos_context_t;
+typedef struct mcsos_thread {
+} mcsos_thread_t;
+typedef struct mcsos_scheduler {
+} mcsos_scheduler_t;
+/* Assembly — context switch */
+void mcsos_context_switch(mcsos_context_t *old_context,
+void mcsos_thread_trampoline(void);
+/* Scheduler API */
+int              mcsos_scheduler_init(mcsos_scheduler_t *sched,
+int              mcsos_thread_prepare(mcsos_thread_t *thread,
+int              mcsos_sched_enqueue(mcsos_scheduler_t *sched,
+mcsos_thread_t  *mcsos_sched_pick_next(mcsos_scheduler_t *sched);
+int              mcsos_sched_yield(mcsos_scheduler_t *sched);
+int              mcsos_sched_tick(mcsos_scheduler_t *sched);
+int              mcsos_thread_block_current(mcsos_scheduler_t *sched);
+int              mcsos_thread_mark_ready(mcsos_scheduler_t *sched,
+int              mcsos_sched_validate(const mcsos_scheduler_t *sched);
+size_t           mcsos_sched_ready_count(const mcsos_scheduler_t *sched);
+#endif /* MCSOS_THREAD_H */
+#ifndef MCSOS_THREAD_H
+#define MCSOS_THREAD_H
+#include <stddef.h>
+#include <stdint.h>
+#define MCSOS_THREAD_MAGIC    UINT64_C(0x4d43534f53544852)
+#define MCSOS_THREAD_NAME_MAX 32u
+#define MCSOS_STACK_ALIGN     16u
+#define MCSOS_MIN_KERNEL_STACK 4096u
+typedef enum mcsos_thread_state {
+} mcsos_thread_state_t;
+typedef enum mcsos_sched_result {
+} mcsos_sched_result_t;
+typedef void (*mcsos_thread_entry_t)(void *arg);
+typedef struct mcsos_context {
+} mcsos_context_t;
+typedef struct mcsos_thread {
+} mcsos_thread_t;
+typedef struct mcsos_scheduler {
+} mcsos_scheduler_t;
+/* Assembly — context switch */
+void mcsos_context_switch(mcsos_context_t *old_context,
+void mcsos_thread_trampoline(void);
+/* Scheduler API */
+int              mcsos_scheduler_init(mcsos_scheduler_t *sched,
+int              mcsos_thread_prepare(mcsos_thread_t *thread,
+int              mcsos_sched_enqueue(mcsos_scheduler_t *sched,
+mcsos_thread_t  *mcsos_sched_pick_next(mcsos_scheduler_t *sched);
+int              mcsos_sched_yield(mcsos_scheduler_t *sched);
+int              mcsos_sched_tick(mcsos_scheduler_t *sched);
+int              mcsos_thread_block_current(mcsos_scheduler_t *sched);
+int              mcsos_thread_mark_ready(mcsos_scheduler_t *sched,
+int              mcsos_sched_validate(const

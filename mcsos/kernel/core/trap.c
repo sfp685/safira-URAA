@@ -25,7 +25,4 @@ void x86_64_trap_dispatch(x86_64_trap_frame_t *frame) {
     kernel_panic_at("trap.c", 45, "CPU Exception Non-Recoverable Terjadi - Fail-Closed Triggered");
 }
 
-// Fungsi pemicu interupsi breakpoint untuk kebutuhan pengujian M4
-void x86_64_trigger_breakpoint_for_test(void) {
-    __asm__ volatile("int $3");
-}
+
