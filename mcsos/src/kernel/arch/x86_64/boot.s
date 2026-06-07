@@ -1,3 +1,11 @@
+	.section .note.gnu.build-id, "a"
+	.align 4
+	.long 4          /* namesz */
+	.long 4          /* descsz */
+	.long 0x1        /* type: NT_GNU_BUILD_ID */
+	.ascii "GNU\0"
+	.long 0x0
+
 	.section .text
 	.align 8
 
