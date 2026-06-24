@@ -1,0 +1,56 @@
+CC       ?= gcc
+HOST_CC  ?= gcc
+OBJDUMP  ?= objdump
+READELF  ?= readelf
+NM       ?= nm
+
+CFLAGS_COMMON := -Iinclude -Wall -Wextra -Werror -std=c17
+KERNEL_CFLAGS := $(CFLAGS_COMMON) -ffreestanding \
+                 -fno-stack-protector -fno-builtin -mno-red-zone -O2 -g
+HOST_CFLAGS   := $(CFLAGS_COMMON) -O2 -g
+
+.PHONY: all host-test audit test clean
+
+all: build/test_syscall_host build/syscall.o build/syscall_entry.o \
+     build/m10_syscall_combined.o audit
+
+build:
+	mkdir -p build
+
+build/test_syscall_host: tests/test_syscall_host.c kernel/syscall/syscall.c \
+                         include/mcsos/syscall.h | build
+	$(HOST_CC) $(HOST_CFLAGS) \
+	    tests/test_syscall_host.c kernel/syscall/syscall.c \
+	    -o $@
+
+build/syscall.o: kernel/syscall/syscall.c include/mcsos/syscall.h | build
+	$(CC) $(KERNEL_CFLAGS) -c kernel/syscall/syscall.c -o $@
+
+build/syscall_entry.o: kernel/syscall/syscall_entry.S | build
+	$(CC) -c kernel/syscall/syscall_entry.S -o $@
+
+build/m10_syscall_combined.o: build/syscall.o build/syscall_entry.o
+	ld -r $^ -o $@
+
+host-test: build/test_syscall_host
+	./build/test_syscall_host
+
+audit: build/m10_syscall_combined.o
+	$(NM) -u build/m10_syscall_combined.o > build/nm_undefined.txt
+	$(READELF) -h build/m10_syscall_combined.o > build/readelf_header.txt
+	$(OBJDUMP) -dr build/m10_syscall_combined.o > build/objdump.txt
+	sha256sum build/test_syscall_host build/m10_syscall_combined.o > build/SHA256SUMS
+	@grep -q "Advanced Micro Devices X86-64" build/readelf_header.txt && \
+	    echo "[AUDIT OK] Machine: x86_64" || \
+	    (echo "[AUDIT FAIL] Machine bukan x86_64"; exit 1)
+	@grep -q "x86_64_syscall_int80_stub" build/objdump.txt && \
+	    echo "[AUDIT OK] symbol stub ditemukan" || \
+	    (echo "[AUDIT FAIL] symbol stub tidak ditemukan"; exit 1)
+	@grep -q "iretq" build/objdump.txt && \
+	    echo "[AUDIT OK] iretq ditemukan" || \
+	    (echo "[AUDIT FAIL] iretq tidak ditemukan"; exit 1)
+
+test: host-test audit
+
+clean:
+	rm -rf build
