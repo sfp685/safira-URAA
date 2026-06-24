@@ -1,20 +1,15 @@
-#include <mcsos/arch/idt.h>
+#include <stdint.h>
 #include <mcsos/kernel/log.h>
 #include "mcsos_thread.h"
+#include "limine.h"
 
-static void early_putc(char c) {
-    unsigned char lsr;
-    do {
-        __asm__ volatile("inb %1, %0" : "=a"(lsr) : "Nd"((unsigned short)0x3FD));
-    } while ((lsr & 0x20) == 0);
-    __asm__ volatile("outb %0, %1" :: "a"(c), "Nd"((unsigned short)0x3F8));
-}
+__attribute__((used, section(".requests_start_marker")))
+static volatile LIMINE_REQUESTS_START_MARKER;
 
-static void early_print(const char *s) {
-    while (*s) early_putc(*s++);
-    early_putc('\r');
-    early_putc('\n');
-}
+__attribute__((used, section(".requests_end_marker")))
+static volatile LIMINE_REQUESTS_END_MARKER;
+
+LIMINE_BASE_REVISION(3);
 
 static uint8_t stack_a[4096];
 static uint8_t stack_b[4096];
@@ -27,17 +22,15 @@ static void thread_a_entry(void *arg) { (void)arg; }
 static void thread_b_entry(void *arg) { (void)arg; }
 
 void kmain(void) {
-    early_print("EARLY: kmain reached");
     log_init();
-    early_print("EARLY: log_init done");
-    log_writeln("[M9] MCSOS booting...");
-    x86_64_idt_init();
-    log_writeln("[M4] IDT initialized");
+    log_writeln("[M9] MCSOS booting via Limine...");
     if (mcsos_scheduler_init(&g_sched, &boot_thread) != MCSOS_SCHED_OK) goto halt;
     log_writeln("[M9] Scheduler OK");
-    mcsos_thread_prepare(&thread_a, "a", thread_a_entry, 0, stack_a, sizeof(stack_a), g_sched.next_id++);
+    mcsos_thread_prepare(&thread_a, "a", thread_a_entry, 0,
+                         stack_a, sizeof(stack_a), g_sched.next_id++);
     mcsos_sched_enqueue(&g_sched, &thread_a);
-    mcsos_thread_prepare(&thread_b, "b", thread_b_entry, 0, stack_b, sizeof(stack_b), g_sched.next_id++);
+    mcsos_thread_prepare(&thread_b, "b", thread_b_entry, 0,
+                         stack_b, sizeof(stack_b), g_sched.next_id++);
     mcsos_sched_enqueue(&g_sched, &thread_b);
     mcsos_sched_yield(&g_sched);
     mcsos_sched_yield(&g_sched);

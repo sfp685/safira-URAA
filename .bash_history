@@ -1,692 +1,3 @@
-mcsos_thread_t *mcsos_sched_pick_next(mcsos_scheduler_t *sched);
-int             mcsos_sched_yield(mcsos_scheduler_t *sched);
-int             mcsos_sched_tick(mcsos_scheduler_t *sched);
-int             mcsos_thread_block_current(mcsos_scheduler_t *sched);
-int             mcsos_thread_mark_ready(mcsos_scheduler_t *sched,
-                                        mcsos_thread_t *thread);
-int             mcsos_sched_validate(const mcsos_scheduler_t *sched);
-size_t          mcsos_sched_ready_count(const mcsos_scheduler_t *sched);
-
-#endif /* MCSOS_THREAD_H */
-EOF
-
-head -3 include/mcsos_thread.h
-# harus muncul: #ifndef MCSOS_THREAD_H
-nano include/mcsos_thread.h
-wc -l include/mcsos_thread.h
-# harus sekitar 90 baris
-tail -3 include/mcsos_thread.h
-# harus muncul: #endif /* MCSOS_THREAD_H */
-clang -std=c17 -Wall -Wextra -Werror -Iinclude -fsyntax-only include/mcsos_thread.h
-echo "Header OK: $?"
-nano kernel/mcsos_thread.c
-wc -l kernel/mcsos_thread.c
-tail -3 kernel/mcsos_thread.c
-clang -std=c17 -Wall -Wextra -Werror -DMCSOS_HOST_TEST -Iinclude -fsyntax-only kernel/mcsos_thread.c
-echo "mcsos_thread.c OK: $?"
-nano arch/x86_64/context_switch.S
-.section .text
-/*
-mcsos_context_switch:
-1:
-wc -l arch/x86_64/context_switch.S
-tail -3 arch/x86_64/context_switch.S
-rm arch/x86_64/context_switch.S
-nano arch/x86_64/context_switch.S
-wc -l arch/x86_64/context_switch.S
-tail -3 arch/x86_64/context_switch.S
-clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector   -fno-pic -mno-red-zone   -c arch/x86_64/context_switch.S -o build/m9/context_switch.o
-echo "context_switch.S OK: $?"
-nano tests/test_scheduler.c
-wc -l tests/test_scheduler.c
-tail -3 tests/test_scheduler.c
-nano Makefile
-grep -n "m9-all\|m9-host-test\|m9-clean" Makefile
-make m9-clean && make m9-all 2>&1 | tee build/m9_build.log
-cat -A Makefile | tail -40
-cat -A Makefile | head -20
-cat > Makefile << 'MAKEEOF'
-# ================================================================
-# M9 - Kernel Thread, Scheduler, Context Switch
-# ================================================================
-CC_HOST   := clang
-CC_KERNEL := clang
-LD_KERNEL := ld.lld
-
-BUILD_M9 := build/m9
-
-CFLAGS_HOST_M9  := -std=c17 -Wall -Wextra -Werror -DMCSOS_HOST_TEST -Iinclude
-CFLAGS_KERN_M9  := -target x86_64-unknown-none-elf -std=c17 \
-                   -ffreestanding -fno-stack-protector -fno-pic \
-                   -mno-red-zone -Wall -Wextra -Werror -Iinclude
-ASFLAGS_KERN_M9 := -target x86_64-unknown-none-elf -ffreestanding \
-                   -fno-stack-protector -fno-pic -mno-red-zone
-
-.PHONY: all m9-all m9-host-test m9-freestanding m9-audit m9-clean
-
-all: m9-all
-
-m9-all: m9-host-test m9-freestanding m9-audit
-
-$(BUILD_M9):
-	mkdir -p $(BUILD_M9)
-
-m9-host-test: $(BUILD_M9)
-	$(CC_HOST) $(CFLAGS_HOST_M9) \
-	  tests/test_scheduler.c kernel/mcsos_thread.c \
-	  -o $(BUILD_M9)/m9_host_test
-	$(BUILD_M9)/m9_host_test | tee $(BUILD_M9)/test_scheduler.log
-
-m9-freestanding: $(BUILD_M9)
-	$(CC_KERNEL) $(CFLAGS_KERN_M9) \
-	  -c kernel/mcsos_thread.c -o $(BUILD_M9)/mcsos_thread.freestanding.o
-	$(CC_KERNEL) $(ASFLAGS_KERN_M9) \
-	  -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o
-	ld.lld -r \
-	  $(BUILD_M9)/mcsos_thread.freestanding.o \
-	  $(BUILD_M9)/context_switch.o \
-	  -o $(BUILD_M9)/m9_scheduler_combined.o
-
-m9-audit: m9-freestanding
-	nm -u $(BUILD_M9)/m9_scheduler_combined.o \
-	  | tee $(BUILD_M9)/nm_undefined.log
-	readelf -h $(BUILD_M9)/m9_scheduler_combined.o \
-	  | tee $(BUILD_M9)/readelf_header.log
-	objdump -d $(BUILD_M9)/m9_scheduler_combined.o \
-	  | grep -E 'mcsos_context_switch|jmp|ret|hlt' \
-	  | tee $(BUILD_M9)/objdump_key.log
-	sha256sum $(BUILD_M9)/m9_host_test \
-	          $(BUILD_M9)/m9_scheduler_combined.o \
-	  | tee $(BUILD_M9)/sha256.log
-
-m9-clean:
-	rm -rf $(BUILD_M9)
-MAKEEOF
-
-cat -A Makefile | head -5
-grep -n "m9-clean" Makefile
-make m9-clean && make m9-all 2>&1 | tee build/m9_build.log
-cat -A Makefile | grep "mkdir\|CC_HOST\|m9_host" | head -5
-python3 - << 'PYEOF'
-content = open("Makefile").read()
-print(repr(content[:200]))
-PYEOF
-
-python3 << 'PYEOF'
-makefile = """\
-# ================================================================
-# M9 - Kernel Thread, Scheduler, Context Switch
-# ================================================================
-CC_HOST   := clang
-CC_KERNEL := clang
-LD_KERNEL := ld.lld
-
-BUILD_M9 := build/m9
-
-CFLAGS_HOST_M9  := -std=c17 -Wall -Wextra -Werror -DMCSOS_HOST_TEST -Iinclude
-CFLAGS_KERN_M9  := -target x86_64-unknown-none-elf -std=c17 \\
-\t\t\t\t   -ffreestanding -fno-stack-protector -fno-pic \\
-\t\t\t\t   -mno-red-zone -Wall -Wextra -Werror -Iinclude
-ASFLAGS_KERN_M9 := -target x86_64-unknown-none-elf -ffreestanding \\
-\t\t\t\t   -fno-stack-protector -fno-pic -mno-red-zone
-
-.PHONY: all m9-all m9-host-test m9-freestanding m9-audit m9-clean
-
-all: m9-all
-
-m9-all: m9-host-test m9-freestanding m9-audit
-
-$(BUILD_M9):
-\tmkdir -p $(BUILD_M9)
-
-m9-host-test: $(BUILD_M9)
-\t$(CC_HOST) $(CFLAGS_HOST_M9) \\
-\t  tests/test_scheduler.c kernel/mcsos_thread.c \\
-\t  -o $(BUILD_M9)/m9_host_test
-\t$(BUILD_M9)/m9_host_test | tee $(BUILD_M9)/test_scheduler.log
-
-m9-freestanding: $(BUILD_M9)
-\t$(CC_KERNEL) $(CFLAGS_KERN_M9) \\
-\t  -c kernel/mcsos_thread.c -o $(BUILD_M9)/mcsos_thread.freestanding.o
-\t$(CC_KERNEL) $(ASFLAGS_KERN_M9) \\
-\t  -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o
-\tld.lld -r \\
-\t  $(BUILD_M9)/mcsos_thread.freestanding.o \\
-\t  $(BUILD_M9)/context_switch.o \\
-\t  -o $(BUILD_M9)/m9_scheduler_combined.o
-
-m9-audit: m9-freestanding
-\tnm -u $(BUILD_M9)/m9_scheduler_combined.o \\
-\t  | tee $(BUILD_M9)/nm_undefined.log
-\treadelf -h $(BUILD_M9)/m9_scheduler_combined.o \\
-\t  | tee $(BUILD_M9)/readelf_header.log
-\tobjdump -d $(BUILD_M9)/m9_scheduler_combined.o \\
-\t  | grep -E 'mcsos_context_switch|jmp|ret|hlt' \\
-\t  | tee $(BUILD_M9)/objdump_key.log
-\tsha256sum $(BUILD_M9)/m9_host_test \\
-\t          $(BUILD_M9)/m9_scheduler_combined.o \\
-\t  | tee $(BUILD_M9)/sha256.log
-
-m9-clean:
-\trm -rf $(BUILD_M9)
-"""
-with open("Makefile", "w") as f:
-    f.write(makefile)
-print("Makefile written OK")
-PYEOF
-
-cat -A Makefile | grep "mkdir\|m9_host_test\|rm -rf"
-make m9-clean && make m9-all 2>&1 | tee build/m9_build.log
-make --print-data-base 2>&1 | grep "m9-clean" | head -5
-ls -la Makefile makefile GNUmakefile 2>&1
-which make && make --version | head -2
-rm makefile
-make m9-clean && make m9-all 2>&1 | tee build/m9_build.log
-git add include/mcsos_thread.h kernel/mcsos_thread.c         arch/x86_64/context_switch.S tests/test_scheduler.c         Makefile build/m9/
-git commit -m "M9: kernel thread, round-robin scheduler, context switch x86_64"
-ls kernel/
-ls arch/x86_64/
-cat kernel/kernel_main.c 2>/dev/null || find . -name "kernel_main*" 2>/dev/null
-cat kernel/kmain.c
-ls kernel/core/
-ls kernel/mcsos/
-find . -name "log.h" 2>/dev/null
-cat mcsos/kernel/log.h
-nano kernel/kmain.c
-wc -l kernel/kmain.c
-tail -5 kernel/kmain.c
-cat Makefile | grep -E "^all|^kernel|qemu|run|boot" | head -20
-find . -name "*.mk" -o -name "build.sh" -o -name "run.sh" -o -name "*.sh" 2>/dev/null | grep -v ".git"
-ls *.sh 2>/dev/null
-find . -not -path "./.git/*" -not -path "./build/*" | sort
-cat linker.ld
-cat kmain.c
-cat log.txt | tail -20
-file mcsos/kernel.elf
-ls src/kernel/arch/x86_64/
-cat src/kernel/arch/x86_64/boot.s | head -30
-file mcsos/kernel.elf
-readelf -h mcsos/kernel.elf | grep -E "Class|Machine|Entry"
-ls src/kernel/arch/x86_64/
-python3 << 'PYEOF'
-addition = """
-# ================================================================
-# M9 - Kernel ELF build (Multiboot + scheduler)
-# ================================================================
-KERNEL_SRCS := src/kernel/arch/x86_64/boot.s \\
-               src/kernel/arch/x86_64/idt.c \\
-               src/kernel/arch/x86_64/isr.s \\
-               src/kernel/arch/x86_64/stubs.c \\
-               src/kernel/arch/x86_64/trap.c \\
-               kernel/arch/x86_64/idt.c \\
-               kernel/core/trap.c \\
-               kernel/kmain.c \\
-               kernel/mcsos_thread.c \\
-               arch/x86_64/context_switch.S
-
-KERNEL_ELF  := build/m9/kernel_m9.elf
-
-KERNEL_CFLAGS := -target x86_64-unknown-none-elf -std=c17 \\
-                 -ffreestanding -fno-stack-protector -fno-pic \\
-                 -mno-red-zone -Wall -Wextra -Werror \\
-                 -Iinclude \\
-                 -Ikernel/arch/x86_64/include \\
-                 -Imcsos/kernel \\
-                 -Imcsos
-
-.PHONY: m9-kernel m9-qemu
-
-m9-kernel: $(BUILD_M9)
-\\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector \\
-\\t  -fno-pic -mno-red-zone \\
-\\t  -c src/kernel/arch/x86_64/boot.s -o $(BUILD_M9)/boot.o
-\\tclang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/idt.c   -o $(BUILD_M9)/idt_src.o
-\\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector \\
-\\t  -fno-pic -mno-red-zone \\
-\\t  -c src/kernel/arch/x86_64/isr.s -o $(BUILD_M9)/isr.o
-\\tclang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/stubs.c -o $(BUILD_M9)/stubs.o
-\\tclang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/trap.c  -o $(BUILD_M9)/trap_src.o
-\\tclang $(KERNEL_CFLAGS) -c kernel/arch/x86_64/idt.c       -o $(BUILD_M9)/idt_kern.o
-\\tclang $(KERNEL_CFLAGS) -c kernel/core/trap.c             -o $(BUILD_M9)/trap_kern.o
-\\tclang $(KERNEL_CFLAGS) -c kernel/kmain.c                 -o $(BUILD_M9)/kmain.o
-\\tclang $(KERNEL_CFLAGS) -c kernel/mcsos_thread.c          -o $(BUILD_M9)/mcsos_thread.o
-\\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector \\
-\\t  -fno-pic -mno-red-zone \\
-\\t  -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o
-\\tld.lld -T linker.ld --no-dynamic-linker \\
-\\t  $(BUILD_M9)/boot.o \\
-\\t  $(BUILD_M9)/idt_src.o \\
-\\t  $(BUILD_M9)/isr.o \\
-\\t  $(BUILD_M9)/stubs.o \\
-\\t  $(BUILD_M9)/trap_src.o \\
-\\t  $(BUILD_M9)/idt_kern.o \\
-\\t  $(BUILD_M9)/trap_kern.o \\
-\\t  $(BUILD_M9)/kmain.o \\
-\\t  $(BUILD_M9)/mcsos_thread.o \\
-\\t  $(BUILD_M9)/context_switch.o \\
-\\t  -o $(KERNEL_ELF)
-\\techo "Kernel ELF built: $(KERNEL_ELF)"
-
-m9-qemu: m9-kernel
-\\tqemu-system-x86_64 \\
-\\t  -kernel $(KERNEL_ELF) \\
-\\t  -serial stdio \\
-\\t  -display none \\
-\\t  -no-reboot \\
-\\t  -m 128M
-"""
-with open("Makefile", "a") as f:
-    f.write(addition)
-print("Makefile updated OK")
-PYEOF
-
-grep -n "m9-kernel\|m9-qemu\|KERNEL_ELF" Makefile
-make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-# Hapus bagian kernel yang rusak (dari baris KERNEL_SRCS ke bawah)
-cut = content.find("\n# ================================================================\n# M9 - Kernel ELF")
-if cut != -1:
-    content = content[:cut]
-
-addition = """
-# ================================================================
-# M9 - Kernel ELF build (Multiboot + scheduler)
-# ================================================================
-KERNEL_ELF   := build/m9/kernel_m9.elf
-KERNEL_CFLAGS := -target x86_64-unknown-none-elf -std=c17 \\
-\t\t\t\t -ffreestanding -fno-stack-protector -fno-pic \\
-\t\t\t\t -mno-red-zone -Wall -Wextra -Werror \\
-\t\t\t\t -Iinclude -Ikernel/arch/x86_64/include -Imcsos
-
-.PHONY: m9-kernel m9-qemu
-
-m9-kernel: $(BUILD_M9)
-\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c src/kernel/arch/x86_64/boot.s -o $(BUILD_M9)/boot.o
-\tclang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/idt.c   -o $(BUILD_M9)/idt_src.o
-\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c src/kernel/arch/x86_64/isr.s -o $(BUILD_M9)/isr.o
-\tclang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/stubs.c -o $(BUILD_M9)/stubs.o
-\tclang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/trap.c  -o $(BUILD_M9)/trap_src.o
-\tclang $(KERNEL_CFLAGS) -c kernel/arch/x86_64/idt.c       -o $(BUILD_M9)/idt_kern.o
-\tclang $(KERNEL_CFLAGS) -c kernel/core/trap.c             -o $(BUILD_M9)/trap_kern.o
-\tclang $(KERNEL_CFLAGS) -c kernel/kmain.c                 -o $(BUILD_M9)/kmain.o
-\tclang $(KERNEL_CFLAGS) -c kernel/mcsos_thread.c          -o $(BUILD_M9)/mcsos_thread.o
-\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o
-\tld.lld -T linker.ld --no-dynamic-linker $(BUILD_M9)/boot.o $(BUILD_M9)/idt_src.o $(BUILD_M9)/isr.o $(BUILD_M9)/stubs.o $(BUILD_M9)/trap_src.o $(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o $(BUILD_M9)/mcsos_thread.o $(BUILD_M9)/context_switch.o -o $(KERNEL_ELF)
-\techo "Kernel ELF built: $(KERNEL_ELF)"
-
-m9-qemu: m9-kernel
-\tqemu-system-x86_64 -kernel $(KERNEL_ELF) -serial stdio -display none -no-reboot -m 128M
-"""
-
-with open("Makefile", "w") as f:
-    f.write(content + addition)
-print("Done")
-PYEOF
-
-cat -A Makefile | grep "clang\|ld.lld\|qemu" | head -5
-tail -20 Makefile
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    lines = f.readlines()
-
-fixed = []
-in_recipe = False
-for line in lines:
-    # Deteksi baris target (tidak dimulai tab/spasi, ada ':')
-    stripped = line.rstrip('\n')
-    if stripped and not stripped[0] in (' ', '\t', '#') and ':' in stripped:
-        in_recipe = True
-        fixed.append(line)
-    elif in_recipe and stripped.startswith('        '):
-        # 8 spasi -> TAB
-        fixed.append('\t' + stripped.lstrip() + '\n')
-    elif in_recipe and stripped.startswith('    '):
-        # 4 spasi -> TAB
-        fixed.append('\t' + stripped.lstrip() + '\n')
-    else:
-        if not stripped:
-            in_recipe = False
-        fixed.append(line)
-
-with open("Makefile", "w") as f:
-    f.writelines(fixed)
-print("Fixed")
-PYEOF
-
-cat -A Makefile | grep "clang\|qemu\|echo" | head -5
-make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-content = content.replace(
-    "-Iinclude -Ikernel/arch/x86_64/include -Imcsos",
-    "-Iinclude -Ikernel/arch/x86_64/include -Imcsos -I."
-)
-
-with open("Makefile", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-grep "KERNEL_CFLAGS" Makefile | head -3
-make m9-clean && make m9-all && make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-cat mcsos/kernel/panic.h
-grep -r "KERNEL_ASSERT" . --include="*.h" --include="*.c" | grep -v ".git"
-head -20 kernel/arch/x86_64/idt.c
-python3 << 'PYEOF'
-with open("mcsos/kernel/panic.h") as f:
-    content = f.read()
-
-# Tambahkan KERNEL_ASSERT sebelum #endif
-assert_macro = """
-#define KERNEL_ASSERT(expr) do { \\
-    if (!(expr)) { \\
-        kernel_panic_at(__FILE__, __LINE__, #expr); \\
-    } \\
-} while (0)
-"""
-
-content = content.replace("#endif", assert_macro + "\n#endif")
-
-with open("mcsos/kernel/panic.h", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-cat mcsos/kernel/panic.h
-make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-grep -n "x86_64_trigger_breakpoint_for_test" kernel/arch/x86_64/idt.c kernel/core/trap.c
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-content = content.replace(
-    "$(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o",
-    "$(BUILD_M9)/kmain.o"
-)
-
-with open("Makefile", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-grep "trap_kern\|kmain.o" Makefile
-make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-grep -n "x86_64_trigger_breakpoint_for_test" kernel/core/trap.c
-sed -n '25,35p' kernel/core/trap.c
-python3 << 'PYEOF'
-with open("kernel/core/trap.c") as f:
-    content = f.read()
-
-# Hapus fungsi duplikat beserta komentarnya
-to_remove = """// Fungsi pemicu interupsi breakpoint untuk kebutuhan pengujian M4
-void x86_64_trigger_breakpoint_for_test(void) {
-    __asm__ volatile("int $3");
-}"""
-
-content = content.replace(to_remove, "")
-
-with open("kernel/core/trap.c", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-grep -n "trigger_breakpoint" kernel/core/trap.c
-# harus kosong
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-content = content.replace(
-    "$(BUILD_M9)/kmain.o",
-    "$(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o",
-    1  # hanya replace pertama kali
-)
-
-with open("Makefile", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-# Perbaiki baris compile kmain yang terkontaminasi
-content = content.replace(
-    "-c kernel/kmain.c                 -o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o",
-    "-c kernel/kmain.c                 -o $(BUILD_M9)/kmain.o"
-)
-
-# Pastikan trap_kern.o ada di baris ld.lld
-content = content.replace(
-    "$(BUILD_M9)/idt_kern.o $(BUILD_M9)/kmain.o",
-    "$(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o"
-)
-
-with open("Makefile", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-grep -n "kmain\|trap_kern\|ld.lld" Makefile | tail -10
-make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-[200~grep -rn "x86_64_exception_stubs" . --include="*.s" --include="*.S" --include="*.c" --include="*.h" | grep -v ".git"~
-grep -rn "x86_64_exception_stubs" . --include="*.s" --include="*.S" --include="*.c" --include="*.h"
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-# Tambah compile isr.S
-content = content.replace(
-    "\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o",
-    "\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o\n\tclang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c kernel/arch/x86_64/isr.S -o $(BUILD_M9)/isr_kern.o"
-)
-
-# Tambah isr_kern.o ke ld.lld
-content = content.replace(
-    "$(BUILD_M9)/context_switch.o -o $(KERNEL_ELF)",
-    "$(BUILD_M9)/context_switch.o $(BUILD_M9)/isr_kern.o -o $(KERNEL_ELF)"
-)
-
-with open("Makefile", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-grep -n "isr_kern" Makefile
-make m9-kernel 2>&1 | tee build/m9_kernel_build.log
-make m9-qemu 2>&1 | tee build/m9_qemu.log
-qemu-system-x86_64   -kernel build/m9/kernel_m9.elf   -serial stdio   -display none   -no-reboot   -m 128M   -append "" 2>&1 | tee build/m9_qemu.log
-readelf -h build/m9/kernel_m9.elf | grep -E "Class|Machine|Type|Entry"
-objdump -d build/m9/kernel_m9.elf | head -30
-which grub-mkrescue grub2-mkrescue 2>/dev/null
-grub-mkrescue --version 2>/dev/null || grub2-mkrescue --version 2>/dev/null
-xorriso --version 2>/dev/null | head -1
-sudo apt-get install -y grub-pc-bin grub-common xorriso mtools
-which grub-mkrescue
-grub-mkrescue --version
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-addition = """
-# ================================================================
-# M9 - ISO + QEMU via GRUB
-# ================================================================
-ISO_DIR := build/m9/iso
-KERNEL_ISO := build/m9/kernel_m9.iso
-
-.PHONY: m9-iso m9-qemu-iso
-
-m9-iso: m9-kernel
-\tmkdir -p $(ISO_DIR)/boot/grub
-\tcp $(KERNEL_ELF) $(ISO_DIR)/boot/kernel_m9.elf
-\tprintf 'set timeout=0\\nset default=0\\nmenuentry "MCSOS M9" {\\n  multiboot2 /boot/kernel_m9.elf\\n  boot\\n}\\n' > $(ISO_DIR)/boot/grub/grub.cfg
-\tgrub-mkrescue -o $(KERNEL_ISO) $(ISO_DIR) 2>&1
-\techo "ISO built: $(KERNEL_ISO)"
-
-m9-qemu-iso: m9-iso
-\tqemu-system-x86_64 \\
-\t  -cdrom $(KERNEL_ISO) \\
-\t  -serial stdio \\
-\t  -display none \\
-\t  -no-reboot \\
-\t  -m 128M
-"""
-
-with open("Makefile", "w") as f:
-    f.write(content + addition)
-print("Done")
-PYEOF
-
-cat -A Makefile | grep "mkdir\|grub-mk\|qemu" | tail -5
-make m9-qemu-iso 2>&1 | tee build/m9_qemu.log
-nano kernel/kmain.c
-head -5 kernel/kmain.c
-grep "log_init" kernel/kmain.c
-make m9-qemu-iso 2>&1 | timeout 8 tee build/m9_qemu.log; cat build/m9_qemu.log | grep "\[M"
-head -10 src/kernel/arch/x86_64/boot.s
-python3 << 'PYEOF'
-with open("Makefile") as f:
-    content = f.read()
-
-content = content.replace(
-    "multiboot2 /boot/kernel_m9.elf",
-    "multiboot /boot/kernel_m9.elf"
-)
-
-with open("Makefile", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-make m9-iso 2>/dev/null
-qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M &
-sleep 6
-kill %1 2>/dev/null
-cat build/m9/serial.log
-timeout 10 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M
-cat build/m9/serial.log
-objdump -d build/m9/kernel_m9.elf | grep -A5 "_start"
-xxd build/m9/kernel_m9.elf | grep "d0 02 b0 01\|02 b0 ad 1b" | head -3
-user@DESKTOP-9H6BVAA:~/mcsos$ objdump -d build/m9/kernel_m9.elf | grep -A5 "_start"
-xxd build/m9/kernel_m9.elf | grep "d0 02 b0 01\|02 b0 ad 1b" | head -3
-0000000000100470 <_start>:
-000000000010047c <.loop>:
-user@DESKTOP-9H6BVAA:~/mcsos$
-cat linker.ld
-python3 << 'PYEOF'
-content = """ENTRY(_start)
-SECTIONS
-{
-    . = 0x100000;
-    .multiboot : { *(.multiboot) }
-    .text : { *(.text) }
-    .rodata : { *(.rodata) }
-    .data : { *(.data) }
-    .bss  : { *(.bss) COMMON }
-}
-"""
-with open("linker.ld", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-cat linker.ld
-make m9-iso 2>/dev/null && timeout 10 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M
-cat build/m9/serial.log
-xxd build/m9/kernel_m9.elf | head -5
-objdump -h build/m9/kernel_m9.elf | grep -E "multiboot|\.text|\.data"
-python3 << 'PYEOF'
-content = """ENTRY(_start)
-SECTIONS
-{
-    . = 0x100000;
-    .multiboot ALIGN(4) : { *(.multiboot) }
-    .text ALIGN(16) : { *(.text) }
-    .rodata ALIGN(4) : { *(.rodata) }
-    .data ALIGN(4) : { *(.data) }
-    .bss ALIGN(4) : {
-        *(.bss)
-        *(COMMON)
-    }
-}
-"""
-with open("linker.ld", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-make m9-kernel 2>/dev/null
-objdump -h build/m9/kernel_m9.elf | grep -E "multiboot|\.text"
-cat src/kernel/arch/x86_64/boot.s
-python3 << 'PYEOF'
-content = """\t.section .text
-\t.align 4
-\t/* Multiboot1 header - harus dalam 8KB pertama */
-\t.long 0x1BADB002
-\t.long 0x00
-\t.long -(0x1BADB002 + 0x00)
-
-\t.global _start
-_start:
-\tmov $stack_top, %rsp
-\tcall kmain
-.loop:
-\thlt
-\tjmp .loop
-
-\t.section .bss
-\t.align 16
-stack_bottom:
-\t.skip 16384
-stack_top:
-"""
-with open("src/kernel/arch/x86_64/boot.s", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-python3 << 'PYEOF'
-content = """ENTRY(_start)
-SECTIONS
-{
-    . = 0x100000;
-    .text : { *(.text) }
-    .rodata : { *(.rodata) }
-    .data : { *(.data) }
-    .bss : { *(.bss) *(COMMON) }
-}
-"""
-with open("linker.ld", "w") as f:
-    f.write(content)
-print("Done")
-PYEOF
-
-make m9-kernel 2>/dev/null
-xxd build/m9/kernel_m9.elf | grep -m1 "02 b0 ad 1b\|1b ad b0 02"
-objdump -h build/m9/kernel_m9.elf | grep "\.text\|\.bss"
-xxd build/m9/kernel_m9.elf | grep -A2 "00100000\|00001000" | head -5
-dd if=build/m9/kernel_m9.elf bs=1 skip=4096 count=16 2>/dev/null | xxd
-make m9-iso 2>/dev/null
-timeout 10 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M
-cat build/m9/serial.log
-timeout 10 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M   -d int,cpu_reset   -D build/m9/qemu_debug.log 2>/dev/null
-cat build/m9/qemu_debug.log | head -30
-cat build/m9/serial.log
-python3 << 'PYEOF'
-content = """\t.section .text
-\t.align 8
-
-\t/* ---- Multiboot2 header ---- */
-\t.long 0xe85250d6          /* magic */
-\t.long 0                   /* architecture: i386 */
 \t.long multiboot2_header_end - multiboot2_header_start  /* header length */
 \t/* checksum */
 \t.long -(0xe85250d6 + 0 + (multiboot2_header_end - multiboot2_header_start))
@@ -1998,3 +1309,692 @@ sleep 1
 cat build/m9/serial.log
 ~cat build/m9/serial.log
 cat build/m9/serial.log
+cd ~/mcsos 
+cat build/m9/serial.log
+reset
+cat build/m9/serial.log
+reset
+cat build/m9/serial.log
+cd ~/mcsos
+cat build/m9/serial.log
+ls -la build/m9/serial.log
+wc -c build/m9/serial.log
+ls -la build/m9/serial.log
+wc -c build/m9/serial.log
+strings build/m9/serial.log | head -30
+strings build/m9/serial.log | grep -E "Load|OK|FAIL|kernel|error|M9"
+readelf -l build/m9/kernel_m9.elf | head -20
+python3 -c "
+data = open('build/m9/kernel_m9.elf','rb').read()
+# Header ada di file offset 0x1000
+hdr = data[0x1000:0x1000+24]
+print('Header bytes:', hdr.hex())
+import struct
+magic, arch, length, checksum = struct.unpack('<IIII', hdr[:16])
+print(f'magic    = 0x{magic:08x} (expect 0xe85250d6)')
+print(f'arch     = 0x{arch:08x} (expect 0x00000000)')
+print(f'length   = 0x{length:08x} (expect 0x00000018 = 24)')
+print(f'checksum = 0x{checksum:08x}')
+total = (magic + arch + length + checksum) & 0xffffffff
+print(f'total    = 0x{total:08x} (expect 0x00000000)')
+"
+python3 << 'PYEOF'
+# 0xe85250d6 dalam little-endian = d6 50 52 e8
+# Tapi 0x52 adalah opcode push, jadi kita tulis sebagai .long langsung
+# dan gunakan .fill untuk avoid assembler reinterpretasi
+
+with open("src/kernel/arch/x86_64/boot.s") as f:
+    content = f.read()
+
+content = content.replace(
+    "\t.byte 0xd6, 0x50, 0x25, 0xe8",
+    "\t.byte 0xd6, 0x50, 0x52, 0xe8"
+)
+
+# Hitung ulang checksum yang benar
+magic = 0xe85250d6
+arch = 0
+length = 24
+checksum = (-(magic + arch + length)) & 0xFFFFFFFF
+print(f"checksum = 0x{checksum:08x}")
+
+content = content.replace(
+    "\t.long 0x17adaf12",
+    f"\t.long 0x{checksum:08x}"
+)
+
+with open("src/kernel/arch/x86_64/boot.s", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null
+python3 -c "
+import struct
+data = open('build/m9/kernel_m9.elf','rb').read()
+hdr = data[0x1000:0x1000+16]
+magic, arch, length, checksum = struct.unpack('<IIII', hdr)
+print(f'magic = 0x{magic:08x} (expect 0xe85250d6: {magic==0xe85250d6})')
+total = (magic+arch+length+checksum)&0xffffffff
+print(f'total = 0x{total:08x} (expect 0x0: {total==0})')
+"
+grub-mkrescue -o build/m9/kernel_m9.iso build/m9/iso 2>/dev/null
+timeout 30 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial.log | grep -E "Load|OK|FAIL|EARLY|M9|error"
+grub-file --is-x86-multiboot2 build/m9/kernel_m9.elf
+echo "multiboot2 exit: $?"
+grub-file --is-x86-multiboot build/m9/kernel_m9.elf  
+echo "multiboot1 exit: $?"
+python3 -c "
+open('build/m9/iso/boot/grub/grub.cfg','w').write('set timeout=0\nset default=0\nmenuentry \"MCSOS M9\" {\n  multiboot2 /boot/kernel_m9.elf\n  boot\n}\n')
+"
+grub-mkrescue -o build/m9/kernel_m9.iso build/m9/iso 2>/dev/null
+timeout 30 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial.log | head -20
+python3 << 'PYEOF'
+with open("src/kernel/arch/x86_64/boot.s") as f:
+    content = f.read()
+
+# Ganti bagian output 'A' dengan inisialisasi serial dulu
+old = """\t/* Tulis 'A' ke serial COM1 langsung dari assembly */
+\tmovl $0x3F8, %edx
+\tmovb $'A', %al
+\toutb %al, %dx
+\tmovb $'\\r', %al
+\toutb %al, %dx
+\tmovb $'\\n', %al
+\toutb %al, %dx"""
+
+new = """\t/* Inisialisasi COM1 */
+\tmovl $0x3F8+1, %edx
+\tmovb $0x00, %al
+\toutb %al, %dx
+\tmovl $0x3F8+3, %edx
+\tmovb $0x80, %al
+\toutb %al, %dx
+\tmovl $0x3F8+0, %edx
+\tmovb $0x01, %al
+\toutb %al, %dx
+\tmovl $0x3F8+1, %edx
+\tmovb $0x00, %al
+\toutb %al, %dx
+\tmovl $0x3F8+3, %edx
+\tmovb $0x03, %al
+\toutb %al, %dx
+\tmovl $0x3F8+2, %edx
+\tmovb $0xC7, %al
+\toutb %al, %dx
+\tmovl $0x3F8+4, %edx
+\tmovb $0x0B, %al
+\toutb %al, %dx
+\t/* Tulis 'A' ke serial */
+\tmovl $0x3F8, %edx
+\tmovb $65, %al
+\toutb %al, %dx"""
+
+content = content.replace(old, new)
+with open("src/kernel/arch/x86_64/boot.s", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && grub-mkrescue -o build/m9/kernel_m9.iso build/m9/iso 2>/dev/null && timeout 30 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial.log | head -5
+xxd build/m9/serial.log | head -5
+wc -c build/m9/serial.log
+readelf -h build/m9/kernel_m9.elf | grep Entry
+objdump -d build/m9/kernel_m9.elf | grep -A5 "<_start>"
+python3 << 'PYEOF'
+with open("src/kernel/arch/x86_64/boot.s") as f:
+    content = f.read()
+
+# Ganti inisialisasi COM1 yang lebih agresif - tulis tanpa tunggu
+old = "\t/* Inisialisasi COM1 */"
+new = "\t/* Inisialisasi COM1 - tulis langsung tanpa cek status */"
+
+# Tambah output ke port 0xe9 (QEMU debug port) yang tidak perlu inisialisasi
+content = content.replace(
+    "\t/* Inisialisasi COM1 */",
+    "\t/* Port 0xe9 = QEMU debug port, langsung tanpa init */\n\tmovl $0xe9, %edx\n\tmovb $65, %al\n\toutb %al, %dx\n\t/* Inisialisasi COM1 */"
+)
+
+with open("src/kernel/arch/x86_64/boot.s", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && grub-mkrescue -o build/m9/kernel_m9.iso build/m9/iso 2>/dev/null && timeout 30 qemu-system-x86_64   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -device isa-debug-exit   -debugcon file:build/m9/debug_port.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== DEBUG PORT ==="
+xxd build/m9/debug_port.log | head -3
+echo "=== SERIAL ==="
+xxd build/m9/serial.log | head -3
+# Install GRUB EFI support
+sudo apt-get install -y grub-efi-amd64-bin ovmf
+# Test dengan UEFI QEMU
+ls /usr/share/ovmf/OVMF.fd 2>/dev/null || ls /usr/share/OVMF/OVMF_CODE.fd 2>/dev/null || find /usr -name "OVMF*.fd" 2>/dev/null | head -3
+# Buat ISO dengan GRUB EFI
+mkdir -p build/m9/iso/EFI/BOOT
+grub-mkstandalone   --format=x86_64-efi   --output=build/m9/iso/EFI/BOOT/BOOTX64.EFI   --modules="part_gpt part_msdos fat iso9660 multiboot2 normal echo"   "boot/grub/grub.cfg=build/m9/iso/boot/grub/grub.cfg" 2>/dev/null
+grub-mkrescue   --modules="part_gpt part_msdos fat iso9660 multiboot2"   -o build/m9/kernel_m9.iso build/m9/iso 2>/dev/null
+echo "ISO built"
+# Jalankan dengan UEFI
+timeout 30 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M 2>/dev/null
+xxd build/m9/serial.log | head -5
+strings build/m9/serial.log | grep -E "EARLY|M9|Loading|MCSOS|A$|^A"
+python3 -c "
+open('build/m9/iso/boot/grub/grub.cfg','w').write('set timeout=0\nset default=0\nmenuentry \"MCSOS M9\" {\n  multiboot2 /boot/kernel_m9.elf\n  boot\n}\n')
+"
+# Rebuild dengan EFI
+grub-mkstandalone   --format=x86_64-efi   --output=build/m9/iso/EFI/BOOT/BOOTX64.EFI   --modules="part_gpt part_msdos fat iso9660 multiboot2 normal echo"   "boot/grub/grub.cfg=build/m9/iso/boot/grub/grub.cfg" 2>/dev/null
+grub-mkrescue   --modules="part_gpt part_msdos fat iso9660 multiboot2"   -o build/m9/kernel_m9.iso build/m9/iso 2>/dev/null
+timeout 30 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial.log | grep -v "^\[" | head -20
+timeout 30 qemu-system-x86_64   -machine pc   -cdrom build/m9/kernel_m9.iso   -serial file:build/m9/serial.log   -display none   -no-reboot   -m 128M   -d guest_errors   -D build/m9/qemu_guest_errors.log 2>/dev/null
+echo "=== SERIAL ==="
+xxd build/m9/serial.log | head -3
+echo "=== GUEST ERRORS ==="
+cat build/m9/qemu_guest_errors.log | head -20
+# Cek apakah ada cross-compiler 32-bit
+which ld.lld
+ld.lld --help 2>&1 | grep "i386\|elf32" | head -3
+python3 << 'PYEOF'
+with open("Makefile") as f:
+    content = f.read()
+
+# Tambah flag elf32 ke linker
+content = content.replace(
+    "\tld.lld -T linker.ld --no-dynamic-linker",
+    "\tld.lld -T linker.ld --no-dynamic-linker -m elf_i386"
+)
+
+with open("Makefile", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>&1 | tail -5
+python3 << 'PYEOF'
+with open("Makefile") as f:
+    content = f.read()
+content = content.replace(
+    "\tld.lld -T linker.ld --no-dynamic-linker -m elf_i386",
+    "\tld.lld -T linker.ld --no-dynamic-linker"
+)
+with open("Makefile", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null
+cp build/m9/test_scheduler.log evidence/m9/
+echo "Host unit test: PASS
+Freestanding compile: OK  
+Kernel ELF built: OK
+QEMU: GRUB load kernel tapi ELF64+Multiboot2 execution terkendala mode CPU
+grub-file --is-x86-multiboot2: exit 0 (header valid)" > evidence/m9/qemu_status.log
+git add -A
+git commit -m "M9: QEMU boot investigation, grub-file validates header"
+timeout 15 qemu-system-x86_64   -kernel build/m9/kernel_m9.elf   -serial file:build/m9/serial_direct.log   -display none   -no-reboot   -m 128M   -append "console=ttyS0" 2>&1 | head -5
+xxd build/m9/serial_direct.log | head -5
+python3 << 'PYEOF'
+# Tambahkan PVH ELF note ke linker script
+content = """ENTRY(_start)
+SECTIONS
+{
+    . = 0x100000;
+    .note.gnu.build-id : { *(.note.gnu.build-id) }
+    .text : { *(.text) }
+    .rodata : { *(.rodata) }
+    .data : { *(.data) }
+    .bss : {
+        *(.bss)
+        *(COMMON)
+    }
+}
+"""
+with open("linker.ld", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+python3 << 'PYEOF'
+with open("src/kernel/arch/x86_64/boot.s") as f:
+    content = f.read()
+
+pvh_note = """\t.section .note.gnu.build-id, "a"
+\t.align 4
+\t.long 4          /* namesz */
+\t.long 4          /* descsz */
+\t.long 0x1        /* type: NT_GNU_BUILD_ID */
+\t.ascii "GNU\\0"
+\t.long 0x0
+
+"""
+
+content = pvh_note + content
+
+with open("src/kernel/arch/x86_64/boot.s", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && timeout 15 qemu-system-x86_64   -kernel build/m9/kernel_m9.elf   -serial file:build/m9/serial_direct.log   -display none   -no-reboot   -m 128M   -append "console=ttyS0" 2>&1 | head -3
+xxd build/m9/serial_direct.log | head -5
+timeout 15 qemu-system-x86_64   -M microvm,x-option-roms=off,pic=off,pit=off   -kernel build/m9/kernel_m9.elf   -serial file:build/m9/serial_direct.log   -display none   -no-reboot   -m 128M 2>&1 | head -5
+echo "exit: $?"
+xxd build/m9/serial_direct.log | head -3
+timeout 15 qemu-system-x86_64   -device loader,file=build/m9/kernel_m9.elf,cpu-num=0   -serial file:build/m9/serial_direct.log   -display none   -no-reboot   -m 128M 2>&1 | head -5
+xxd build/m9/serial_direct.log | head -3
+xxd build/m9/serial_direct.log | head -10
+wc -c build/m9/serial_direct.log
+timeout 15 qemu-system-x86_64   -device loader,file=build/m9/kernel_m9.elf,cpu-num=0   -device loader,addr=0x100018,cpu-num=0   -serial file:build/m9/serial_direct.log   -display none   -no-reboot   -m 128M 2>&1 | head -5
+xxd build/m9/serial_direct.log | head -5
+wc -c build/m9/serial_direct.log
+git add -A
+git commit -m "M9: all scheduler code complete, host test PASS, QEMU boot WIP"
+git log --oneline -5
+grep -i "qemu\|serial\|boot\|run" /mnt/user-data/uploads/OS_panduan_M9.md | head -30
+# Cek apakah Limine tersedia
+which limine 2>/dev/null
+apt-cache search limine 2>/dev/null | head -5
+ls ~/mcsos/limine* 2>/dev/null
+find ~ -name "limine*" 2>/dev/null | head -5
+ls ~/iso_root/
+ls ~/iso_root/boot/limine/
+cat ~/limine.cfg
+ls ~/iso_root/boot/
+find ~/iso_root -name "*.elf" 2>/dev/null
+which limine
+ls ~/limine* 2>/dev/null
+# Copy kernel M9
+cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf
+# Update limine.cfg untuk M9
+cat > ~/limine.cfg << 'EOF'
+TIMEOUT=0
+:MCSOS M9
+    PROTOCOL=limine
+    KERNEL_PATH=boot:///boot/kernel.elf
+EOF
+
+cat ~/limine.cfg
+file ~/iso_root/boot/kernel.elf
+readelf -h ~/iso_root/boot/kernel.elf | grep -E "Class|Machine|Entry"
+# Buat ISO dengan Limine
+xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null
+# Deploy limine ke ISO
+~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null
+echo "ISO built"
+# Jalankan QEMU
+timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+python3 << 'PYEOF'
+content = """\t.section .text
+\t.global _start
+\t.code64
+_start:
+\t/* Limine sudah setup long mode, langsung panggil kmain */
+\tmovabsq $stack_top, %rsp
+\txorq %rbp, %rbp
+\tcall kmain
+hang:
+\thlt
+\tjmp hang
+
+\t.section .bss
+\t.align 16
+stack_bottom:
+\t.skip 16384
+stack_top:
+"""
+with open("src/kernel/arch/x86_64/boot.s", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf && xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+# Limine.cfg harus ada di iso_root
+cp ~/limine.cfg ~/iso_root/boot/limine/limine.cfg
+cat ~/iso_root/boot/limine/limine.cfg
+xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+nano kernel/kmain.c
+make m9-kernel 2>/dev/null && cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf && xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+timeout 15 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+timeout 15 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -no-reboot   -m 128M   -d guest_errors   -D build/m9/limine_debug.log 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+echo "=== GUEST ERRORS ==="
+head -10 build/m9/limine_debug.log
+python3 << 'PYEOF'
+content = """ENTRY(_start)
+SECTIONS
+{
+    . = 0xFFFFFFFF80100000;
+    .text : { *(.text) }
+    .rodata : { *(.rodata) }
+    .data : { *(.data) }
+    .bss : {
+        *(.bss)
+        *(COMMON)
+    }
+}
+"""
+with open("linker.ld", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf && xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+timeout 10 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -no-reboot   -m 128M 2>/dev/null &
+sleep 8
+kill %1 2>/dev/null
+echo "=== SERIAL ==="
+cat build/m9/serial_limine.log
+timeout 10 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -no-reboot   -m 128M &
+timeout 10 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>build/m9/limine_stderr.log
+cat build/m9/serial_limine.log
+cat build/m9/limine_stderr.log
+timeout 10 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>build/m9/limine_stderr.log
+cat build/m9/serial_limine.log
+cat build/m9/limine_stderr.log
+cd ~/mcsos
+cat build/m9/serial_limine.log
+cat build/m9/limine_stderr.log 2>/dev/null
+readelf -h build/m9/kernel_m9.elf | grep Entry
+nm build/m9/kernel_m9.elf | grep stack_top
+python3 << 'PYEOF'
+content = """\t.section .text
+\t.global _start
+\t.code64
+_start:
+\t/* Setup stack dulu */
+\tmovabsq $stack_top, %rsp
+\txorq %rbp, %rbp
+
+\t/* Init COM1 dan tulis 'A' langsung */
+\tmovw $0x3F9, %dx
+\tmovb $0x00, %al
+\toutb %al, %dx
+\tmovw $0x3FB, %dx
+\tmovb $0x80, %al
+\toutb %al, %dx
+\tmovw $0x3F8, %dx
+\tmovb $0x03, %al
+\toutb %al, %dx
+\tmovw $0x3F9, %dx
+\tmovb $0x00, %al
+\toutb %al, %dx
+\tmovw $0x3FB, %dx
+\tmovb $0x03, %al
+\toutb %al, %dx
+\tmovw $0x3FA, %dx
+\tmovb $0xC7, %al
+\toutb %al, %dx
+\tmovw $0x3FC, %dx
+\tmovb $0x0B, %al
+\toutb %al, %dx
+
+\t/* Tulis 'A' */
+\tmovw $0x3F8, %dx
+\tmovb $65, %al
+\toutb %al, %dx
+\tmovb $13, %al
+\toutb %al, %dx
+\tmovb $10, %al
+\toutb %al, %dx
+
+\tcall kmain
+hang:
+\thlt
+\tjmp hang
+
+\t.section .bss
+\t.align 16
+stack_bottom:
+\t.skip 16384
+stack_top:
+"""
+with open("src/kernel/arch/x86_64/boot.s", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf && xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+xxd build/m9/serial_limine.log | head -5
+nano include/limine.h
+python3 << 'PYEOF'
+with open("kernel/kmain.c") as f:
+    content = f.read()
+
+# Tambah limine base revision di awal file setelah includes
+content = content.replace(
+    '#include "mcsos_thread.h"',
+    '#include "mcsos_thread.h"\n#include "limine.h"\n\nLIMINE_BASE_REVISION(2)'
+)
+
+with open("kernel/kmain.c", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf && xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+xxd build/m9/serial_limine.log | head -5
+~/limine/limine --version 2>/dev/null || ~/limine/limine version 2>/dev/null
+ls ~/limine/
+cat ~/limine/limine.h | head -50
+cp ~/limine/limine.h include/limine.h
+python3 << 'PYEOF'
+with open("kernel/kmain.c") as f:
+    content = f.read()
+
+content = content.replace(
+    '#include "limine.h"\n\nLIMINE_BASE_REVISION(2)',
+    '#include "limine.h"\n\nLIMINE_REQUESTS_START_MARKER;\nLIMINE_BASE_REVISION(3);\nLIMINE_REQUESTS_END_MARKER;'
+)
+
+with open("kernel/kmain.c", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+make m9-kernel 2>/dev/null && cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf && xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+xxd build/m9/serial_limine.log | head -5
+ls ~/iso_root/boot/limine/
+# Limine v7 pakai format baru
+cat > ~/iso_root/boot/limine/limine.cfg << 'EOF'
+/MCSOS M9
+    PROTOCOL=limine
+    PATH=boot():/boot/kernel.elf
+EOF
+
+cat ~/iso_root/boot/limine/limine.cfg
+xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+xxd build/m9/serial_limine.log | head -5
+timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+echo "=== SERIAL ==="
+xxd build/m9/serial_limine.log | head -5
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -30
+# Limine v7 format baru - pakai timeout dan entry berbeda
+cat > ~/iso_root/boot/limine/limine.cfg << 'EOF'
+TIMEOUT=0
+GRAPHICS=no
+SERIAL=yes
+
+/MCSOS M9
+    PROTOCOL=limine
+    PATH=boot():/boot/kernel.elf
+EOF
+
+cat ~/iso_root/boot/limine/limine.cfg
+xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | head -20
+wc -c build/m9/serial_limine.log
+strings build/m9/serial_limine.log | head -40
+# Coba format path yang berbeda
+cat > ~/iso_root/boot/limine/limine.cfg << 'EOF'
+TIMEOUT=0
+GRAPHICS=no
+SERIAL=yes
+
+/MCSOS M9
+    PROTOCOL=limine
+    PATH=boot():/boot/kernel.elf
+    KASLR=no
+EOF
+
+# Juga coba tanpa boot()
+cat > /tmp/limine_alt.cfg << 'EOF'
+TIMEOUT=0
+GRAPHICS=no
+SERIAL=yes
+
+/MCSOS M9
+    PROTOCOL=limine
+    PATH=:/boot/kernel.elf
+    KASLR=no
+EOF
+
+cat ~/iso_root/boot/limine/limine.cfg
+find ~/limine -name "*.cfg" 2>/dev/null
+cat ~/limine/limine.h | grep -A5 "PATH\|KERNEL_PATH" | head -20
+find ~/limine -name "*.cfg" 2>/dev/null
+cat ~/limine/limine.h | grep -A5 "PATH\|KERNEL_PATH" | head -20
+cat > ~/iso_root/boot/limine/limine.cfg << 'EOF'
+TIMEOUT=0
+SERIAL=yes
+
+/MCSOS M9
+    PROTOCOL=limine
+    KERNEL_PATH=boot():/boot/kernel.elf
+    KASLR=no
+EOF
+
+xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -20
+# Cek apakah ada limine binary lain
+find ~ -name "limine" -type f 2>/dev/null
+# Cek versi limine di iso_root
+file ~/iso_root/boot/limine/limine-bios-cd.bin
+# Lihat bagaimana M2 dulu build ISO
+find ~ -name "Makefile" | xargs grep -l "limine\|xorriso" 2>/dev/null | head -5
+cat ~/limine/Makefile
+history | grep -E "qemu|limine|xorriso|iso" | head -30
+history | grep -E "limine|xorriso" | head -20
+git log --oneline | head -10
+git show 04b56ec --stat | head -20
+git show d18dc71 --stat | head -10
+git show d18dc71 -- mcsos/Makefile 2>/dev/null | head -50
+git show d18dc71 -- Makefile 2>/dev/null | head -50
+git show d18dc71 -- kernel/kernel.c
+git show d18dc71 --name-only | head -20
+git log --oneline -15
+git show d18dc71:kernel/kernel.c
+cd ~/mcsos
+git log --oneline -5
+git show d18dc71 --name-only | grep -i "linker\|ld\|link"
+find . -name "*.ld" | head -5
+git log --all --oneline | head -20
+git show d18dc71:linker.ld 2>/dev/null || git show 04b56ec:linker.ld 2>/dev/null
+python3 << 'PYEOF'
+content = """OUTPUT_FORMAT("elf64-x86-64")
+ENTRY(kmain)
+SECTIONS
+{
+    . = 0xffffffff80000000;
+    .text : ALIGN(0x1000) { *(.text .text.*) }
+    .rodata : ALIGN(0x1000) { *(.rodata .rodata.*) }
+    .requests_start_marker : ALIGN(0x1000) { *(.requests_start_marker) }
+    .requests : { *(.requests) }
+    .requests_end_marker : { *(.requests_end_marker) }
+    .data : ALIGN(0x1000) { *(.data .data.*) }
+    .bss : ALIGN(0x1000) {
+        *(.bss .bss.*)
+        *(COMMON)
+    }
+}
+"""
+with open("linker.ld", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+python3 << 'PYEOF'
+content = """\t.section .text
+\t.global kmain
+"""
+with open("src/kernel/arch/x86_64/boot.s", "w") as f:
+    f.write(content)
+print("Done")
+PYEOF
+
+nano kernel/kmain.c
+make m9-kernel 2>&1 | tail -5
+cp build/m9/kernel_m9.elf ~/iso_root/boot/kernel.elf && xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -20
+ls ~/iso_root/EFI/BOOT/ 2>/dev/null || echo "EFI dir tidak ada"
+cp ~/limine/BOOTX64.EFI ~/iso_root/EFI/BOOT/BOOTX64.EFI
+# Rebuild ISO
+xorriso -as mkisofs   -b boot/limine/limine-bios-cd.bin   -no-emul-boot -boot-load-size 4 -boot-info-table   --efi-boot boot/limine/limine-uefi-cd.bin   -efi-boot-part --efi-boot-image   --protective-msdos-label   ~/iso_root -o build/m9/mcsos_m9_limine.iso 2>/dev/null && ~/limine/limine bios-install build/m9/mcsos_m9_limine.iso 2>/dev/null && timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -cdrom build/m9/mcsos_m9_limine.iso   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -20
+# Cek isi ISO
+isoinfo -l -i build/m9/mcsos_m9_limine.iso 2>/dev/null | grep -i "efi\|boot\|limine" | head -20
+# Mount ISO dan cek isinya
+sudo mkdir -p /mnt/iso
+sudo mount -o loop build/m9/mcsos_m9_limine.iso /mnt/iso 2>/dev/null
+find /mnt/iso -type f | head -20
+sudo umount /mnt/iso 2>/dev/null
+timeout 15 qemu-system-x86_64   -bios /usr/share/ovmf/OVMF.fd   -drive file=build/m9/mcsos_m9_limine.iso,media=cdrom   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -20
+ls /usr/share/OVMF/ 2>/dev/null
+ls /usr/share/ovmf/ 2>/dev/null
+find /usr -name "OVMF*.fd" 2>/dev/null
+cp /usr/share/OVMF/OVMF_VARS_4M.fd /tmp/OVMF_VARS.fd
+timeout 15 qemu-system-x86_64   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd   -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd   -drive file=build/m9/mcsos_m9_limine.iso,media=cdrom   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -20
+# Buat disk image dengan partisi EFI
+dd if=/dev/zero of=build/m9/disk.img bs=1M count=64 2>/dev/null
+parted build/m9/disk.img --script mklabel gpt mkpart ESP fat32 1MiB 63MiB set 1 esp on 2>/dev/null
+# Mount dan isi dengan file Limine
+sudo losetup -fP build/m9/disk.img
+LOOP=$(sudo losetup -j build/m9/disk.img | cut -d: -f1)
+echo "Loop: $LOOP"
+sudo mkfs.fat -F32 ${LOOP}p1 2>/dev/null
+sudo mkdir -p /mnt/efi
+sudo mount ${LOOP}p1 /mnt/efi
+sudo mkdir -p /mnt/efi/EFI/BOOT
+sudo mkdir -p /mnt/efi/boot/limine
+sudo cp ~/limine/BOOTX64.EFI /mnt/efi/EFI/BOOT/
+sudo cp ~/iso_root/boot/limine/limine.cfg /mnt/efi/boot/limine/
+sudo cp ~/iso_root/boot/limine/limine-bios.sys /mnt/efi/boot/limine/
+sudo cp ~/iso_root/boot/kernel.elf /mnt/efi/boot/
+sudo umount /mnt/efi
+sudo losetup -d $LOOP
+timeout 15 qemu-system-x86_64   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd   -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd   -drive file=build/m9/disk.img,format=raw   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -20
+# Format langsung tanpa partisi
+dd if=/dev/zero of=build/m9/efi.img bs=1M count=32 2>/dev/null
+mkfs.fat -F32 build/m9/efi.img 2>/dev/null
+sudo mkdir -p /mnt/efi
+sudo mount build/m9/efi.img /mnt/efi
+sudo mkdir -p /mnt/efi/EFI/BOOT
+sudo mkdir -p /mnt/efi/boot/limine
+sudo cp ~/limine/BOOTX64.EFI /mnt/efi/EFI/BOOT/
+sudo cp ~/iso_root/boot/limine/limine.cfg /mnt/efi/boot/limine/
+sudo cp ~/iso_root/boot/kernel.elf /mnt/efi/boot/
+sudo umount /mnt/efi
+timeout 15 qemu-system-x86_64   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd   -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd   -drive file=build/m9/efi.img,format=raw,if=virtio   -serial file:build/m9/serial_limine.log   -display none   -no-reboot   -m 128M 2>/dev/null
+strings build/m9/serial_limine.log | grep -v "^\[" | grep -v "^$" | head -20

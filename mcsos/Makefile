@@ -73,8 +73,8 @@ m9-kernel: $(BUILD_M9)
 	clang $(KERNEL_CFLAGS) -c src/kernel/arch/x86_64/trap.c  -o $(BUILD_M9)/trap_src.o
 	clang $(KERNEL_CFLAGS) -c kernel/arch/x86_64/idt.c       -o $(BUILD_M9)/idt_kern.o
 	clang $(KERNEL_CFLAGS) -c kernel/core/trap.c             -o $(BUILD_M9)/trap_kern.o
-	clang $(KERNEL_CFLAGS) -c kernel/kmain.c                 -o $(BUILD_M9)/kmain.o
-	clang $(KERNEL_CFLAGS) -c kernel/mcsos_thread.c          -o $(BUILD_M9)/mcsos_thread.o
+	clang $(KERNEL_CFLAGS) -DMCSOS_HOST_TEST -c kernel/kmain.c -o $(BUILD_M9)/kmain.o
+	clang $(KERNEL_CFLAGS) -DMCSOS_HOST_TEST -c kernel/mcsos_thread.c -o $(BUILD_M9)/mcsos_thread.o
 	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o
 	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c kernel/arch/x86_64/isr.S -o $(BUILD_M9)/isr_kern.o
 	ld.lld -T linker.ld --no-dynamic-linker $(BUILD_M9)/boot.o $(BUILD_M9)/idt_src.o $(BUILD_M9)/isr.o $(BUILD_M9)/stubs.o $(BUILD_M9)/trap_src.o $(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o $(BUILD_M9)/mcsos_thread.o $(BUILD_M9)/context_switch.o $(BUILD_M9)/isr_kern.o -o $(KERNEL_ELF)
