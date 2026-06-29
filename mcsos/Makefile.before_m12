@@ -77,11 +77,7 @@ m9-kernel: $(BUILD_M9)
 	clang $(KERNEL_CFLAGS) -DMCSOS_HOST_TEST -c kernel/mcsos_thread.c -o $(BUILD_M9)/mcsos_thread.o
 	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c arch/x86_64/context_switch.S -o $(BUILD_M9)/context_switch.o
 	clang -target x86_64-unknown-none-elf -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -c kernel/arch/x86_64/isr.S -o $(BUILD_M9)/isr_kern.o
-	clang $(KERNEL_CFLAGS) -I. -c kernel/sync/lockdep.c  -o $(BUILD_M9)/lockdep.o
-	clang $(KERNEL_CFLAGS) -I. -c kernel/sync/spinlock.c -o $(BUILD_M9)/spinlock.o
-	clang $(KERNEL_CFLAGS) -I. -c kernel/sync/mutex.c    -o $(BUILD_M9)/mutex.o
-	clang $(KERNEL_CFLAGS) -I. -c kernel/sync/selftest.c -o $(BUILD_M9)/selftest.o
-	ld.lld -T linker.ld --no-dynamic-linker $(BUILD_M9)/boot.o $(BUILD_M9)/idt_src.o $(BUILD_M9)/isr.o $(BUILD_M9)/stubs.o $(BUILD_M9)/trap_src.o $(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o $(BUILD_M9)/mcsos_thread.o $(BUILD_M9)/context_switch.o $(BUILD_M9)/isr_kern.o $(BUILD_M9)/lockdep.o $(BUILD_M9)/spinlock.o $(BUILD_M9)/mutex.o $(BUILD_M9)/selftest.o -o $(KERNEL_ELF)
+	ld.lld -T linker.ld --no-dynamic-linker $(BUILD_M9)/boot.o $(BUILD_M9)/idt_src.o $(BUILD_M9)/isr.o $(BUILD_M9)/stubs.o $(BUILD_M9)/trap_src.o $(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o $(BUILD_M9)/mcsos_thread.o $(BUILD_M9)/context_switch.o $(BUILD_M9)/isr_kern.o -o $(KERNEL_ELF)
 	echo "Kernel ELF built: $(KERNEL_ELF)"
 
 m9-qemu: m9-kernel

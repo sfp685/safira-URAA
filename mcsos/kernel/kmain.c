@@ -1,15 +1,8 @@
 #include <stdint.h>
 #include <mcsos/kernel/log.h>
 #include "mcsos_thread.h"
-#include "limine.h"
 
-__attribute__((used, section(".requests_start_marker")))
-static volatile LIMINE_REQUESTS_START_MARKER;
-
-__attribute__((used, section(".requests_end_marker")))
-static volatile LIMINE_REQUESTS_END_MARKER;
-
-LIMINE_BASE_REVISION(3);
+void m12_sync_selftest(void);
 
 static uint8_t stack_a[4096];
 static uint8_t stack_b[4096];
@@ -23,7 +16,8 @@ static void thread_b_entry(void *arg) { (void)arg; }
 
 void kmain(void) {
     log_init();
-    log_writeln("[M9] MCSOS booting via Limine...");
+    log_writeln("[M9] MCSOS booting...");
+    m12_sync_selftest();
     if (mcsos_scheduler_init(&g_sched, &boot_thread) != MCSOS_SCHED_OK) goto halt;
     log_writeln("[M9] Scheduler OK");
     mcsos_thread_prepare(&thread_a, "a", thread_a_entry, 0,
