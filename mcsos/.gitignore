@@ -1,2 +1,6 @@
 artifacts/m14/preflight.log
 artifacts/m14/git_status_before_m14.txt
+artifacts/m14_nm_undefined.txt
+artifacts/m14_readelf_block.txt
+artifacts/m14_objdump_block.txt
+artifacts/m14_sha256.txt
