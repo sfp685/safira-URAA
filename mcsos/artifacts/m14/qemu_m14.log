@@ -9,5 +9,7 @@ Booting from Hard Disk...
 Boot failed: could not read the boot disk
 
 Booting from DVD/CD...
-Halo Safira, Kernel M6 berhasil jalan!
-qemu-system-x86_64: terminating on signal 15 from pid 16973 (timeout)
+[H[J[1;1HHalo Safira, Kernel M6 berhasil jalan!
+M14: block layer initialized
+[M14] block device registered: ram0
+qemu-system-x86_64: terminating on signal 15 from pid 17532 (timeout)

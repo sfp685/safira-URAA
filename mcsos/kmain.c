@@ -4,7 +4,10 @@ void serial_write_string(char* str) {
     }
 }
 
+extern void block_demo_run(void);
+
 void kmain() {
     serial_write_string("Halo Safira, Kernel M6 berhasil jalan!\n");
+    block_demo_run();
     while(1);
 }

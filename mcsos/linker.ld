@@ -1,8 +1,13 @@
-ENTRY(kmain)
+OUTPUT_FORMAT("elf64-x86-64")
+ENTRY(_start)
+
 SECTIONS
 {
-    . = 0x100000;
-    .text : { *(.text) }
-    .data : { *(.data) }
-    .bss  : { *(.bss)  }
+    . = 1M;
+
+    .multiboot : { *(.multiboot) }
+    .text : { *(.text .text.*) }
+    .rodata : { *(.rodata .rodata.*) }
+    .data : { *(.data .data.*) }
+    .bss : { *(.bss .bss.*) *(COMMON) }
 }
