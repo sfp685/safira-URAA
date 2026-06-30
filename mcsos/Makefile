@@ -10,7 +10,7 @@ BUILD_M9 := build/m9
 CFLAGS_HOST_M9  := -std=c17 -Wall -Wextra -Werror -DMCSOS_HOST_TEST -Iinclude
 CFLAGS_KERN_M9  := -target x86_64-unknown-none-elf -std=c17 \
 				   -ffreestanding -fno-stack-protector -fno-pic \
-				   -mno-red-zone -Wall -Wextra -Werror -Iinclude
+				   -mno-red-zone -Wall -Wextra -Werror -Iinclude -g -O0
 ASFLAGS_KERN_M9 := -target x86_64-unknown-none-elf -ffreestanding \
 				   -fno-stack-protector -fno-pic -mno-red-zone
 
@@ -61,7 +61,7 @@ KERNEL_ELF   := build/m9/kernel_m9.elf
 KERNEL_CFLAGS := -target x86_64-unknown-none-elf -std=c17 \
 				 -ffreestanding -fno-stack-protector -fno-pic \
 				 -mno-red-zone -Wall -Wextra -Werror \
-				 -Iinclude -Ikernel/arch/x86_64/include -Imcsos -I.
+				 -Iinclude -Ikernel/arch/x86_64/include -Imcsos -I. -g -O0
 
 .PHONY: m9-kernel m9-qemu
 
@@ -81,7 +81,14 @@ m9-kernel: $(BUILD_M9)
 	clang $(KERNEL_CFLAGS) -I. -c kernel/sync/spinlock.c -o $(BUILD_M9)/spinlock.o
 	clang $(KERNEL_CFLAGS) -I. -c kernel/sync/mutex.c    -o $(BUILD_M9)/mutex.o
 	clang $(KERNEL_CFLAGS) -I. -c kernel/sync/selftest.c -o $(BUILD_M9)/selftest.o
-	ld.lld -T linker.ld --no-dynamic-linker $(BUILD_M9)/boot.o $(BUILD_M9)/idt_src.o $(BUILD_M9)/isr.o $(BUILD_M9)/stubs.o $(BUILD_M9)/trap_src.o $(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o $(BUILD_M9)/mcsos_thread.o $(BUILD_M9)/context_switch.o $(BUILD_M9)/isr_kern.o $(BUILD_M9)/lockdep.o $(BUILD_M9)/spinlock.o $(BUILD_M9)/mutex.o $(BUILD_M9)/selftest.o -o $(KERNEL_ELF)
+	clang $(KERNEL_CFLAGS) -c kernel/vfs/ramfs.c   -o $(BUILD_M9)/ramfs.o
+	clang $(KERNEL_CFLAGS) -c kernel/vfs/fd.c      -o $(BUILD_M9)/fd.o
+	clang $(KERNEL_CFLAGS) -c kernel/vfs/sys_vfs.c -o $(BUILD_M9)/sys_vfs.o
+	ld.lld -T linker.ld --no-dynamic-linker $(BUILD_M9)/boot.o $(BUILD_M9)/idt_src.o $(BUILD_M9)/isr.o $(BUILD_M9)/stubs.o $(BUILD_M9)/trap_src.o $(BUILD_M9)/idt_kern.o $(BUILD_M9)/trap_kern.o $(BUILD_M9)/kmain.o $(BUILD_M9)/mcsos_thread.o $(BUILD_M9)/context_switch.o $(BUILD_M9)/isr_kern.o $(BUILD_M9)/lockdep.o $(BUILD_M9)/spinlock.o $(BUILD_M9)/mutex.o $(BUILD_M9)/selftest.o \
+	  $(BUILD_M9)/ramfs.o \
+	  $(BUILD_M9)/fd.o \
+	  $(BUILD_M9)/sys_vfs.o \
+	  -o $(KERNEL_ELF)
 	echo "Kernel ELF built: $(KERNEL_ELF)"
 
 m9-qemu: m9-kernel
@@ -109,3 +116,57 @@ m9-qemu-iso: m9-iso
 	  -display none \
 	  -no-reboot \
 	  -m 128M
+
+# ================================================================
+# M13 - VFS / RAMFS / FD Table
+# ================================================================
+BUILD_M13 := build/m13
+
+CFLAGS_HOST_M13 := -std=c17 -Wall -Wextra -Werror -DMCSOS_HOST_TEST -Iinclude
+
+.PHONY: m13-all m13-host-test m13-clean
+
+m13-all: m13-host-test
+
+$(BUILD_M13):
+	mkdir -p $(BUILD_M13)
+
+m13-host-test: $(BUILD_M13)
+	$(CC_HOST) $(CFLAGS_HOST_M13) \
+	  tests/m13_vfs_host_test.c \
+	  kernel/vfs/ramfs.c \
+	  kernel/vfs/fd.c \
+	  kernel/vfs/sys_vfs.c \
+	  -o $(BUILD_M13)/m13_host_test
+	$(BUILD_M13)/m13_host_test | tee $(BUILD_M13)/test_vfs.log
+
+m13-clean:
+	rm -rf $(BUILD_M13)
+
+# ================================================================
+# M9 - DEBUG: GDB + QEMU
+# ================================================================
+GDB_PORT := 1234
+
+CFLAGS_KERN_M9_DBG := -target x86_64-unknown-none-elf -std=c17 \
+                       -ffreestanding -fno-stack-protector -fno-pic \
+                       -mno-red-zone -Wall -Wextra -Werror -Iinclude -g -O0 \
+                       -g -O0
+
+.PHONY: m9-qemu-debug m9-gdb
+
+m9-qemu-debug: m9-iso
+	qemu-system-x86_64 \
+	  -cdrom $(KERNEL_ISO) \
+	  -serial stdio \
+	  -display none \
+	  -no-reboot \
+	  -m 128M \
+	  -s \
+	  -S
+
+m9-gdb:
+	gdb $(KERNEL_ELF) \
+	  -ex "set architecture i386:x86-64" \
+	  -ex "target remote localhost:$(GDB_PORT)" \
+	  -ex "continue"
