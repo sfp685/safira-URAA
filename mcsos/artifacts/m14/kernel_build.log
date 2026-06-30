@@ -1,0 +1,19 @@
+mkdir -p build
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/boot.s -o build/boot.o
+clang: warning: argument unused during compilation: '-ffreestanding' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-protector' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-check' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-mcmodel=kernel' [-Wunused-command-line-argument]
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kmain.c -o build/kmain.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/idt.c -o build/idt.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/trap.c -o build/trap.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/stubs.c -o build/stubs.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/isr.s -o build/isr.o
+clang: warning: argument unused during compilation: '-ffreestanding' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-protector' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-check' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-mcmodel=kernel' [-Wunused-command-line-argument]
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/block/block.c -o build/block.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/block/ramblk.c -o build/ramblk.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -mcmodel=kernel -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/block/bcache.c -o build/bcache.o
+ld.lld -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=build/kernel.map -o build/kernel.elf build/boot.o build/kmain.o build/idt.o build/trap.o build/stubs.o build/isr.o build/block.o build/ramblk.o build/bcache.o
