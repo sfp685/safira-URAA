@@ -1,0 +1,12 @@
+ M ../.bash_history
+?? ../backup/restore_m12/
+?? artifacts/m14/git_status_after_m14.txt
+?? artifacts/m14/m14_final_sha256.txt
+?? artifacts/m14/m14_nm_undefined.txt
+?? artifacts/m14/m14_readelf_block.txt
+?? linker.ld.backup_m14
+?? linker.ld.bak
+?? makefile.backup_m14
+?? makefile.bak
+?? src/kernel/arch/x86_64/boot.s.bak
+?? ../mcsos_final/
