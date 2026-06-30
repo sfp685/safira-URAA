@@ -1,0 +1,8 @@
+./build/test_m14_block
+M14 host tests PASS
+ld -r -o build/m14_block_layer.o build/block.o build/ramblk.o build/bcache.o
+nm -u build/m14_block_layer.o > artifacts/m14_nm_undefined.txt
+readelf -h build/m14_block_layer.o > artifacts/m14_readelf_block.txt
+objdump -dr build/m14_block_layer.o > artifacts/m14_objdump_block.txt
+sha256sum build/block.o build/ramblk.o build/bcache.o build/m14_block_layer.o build/test_m14_block > artifacts/m14_sha256.txt
+test ! -s artifacts/m14_nm_undefined.txt

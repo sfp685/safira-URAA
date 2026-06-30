@@ -1,0 +1,11 @@
+ M ../.bash_history
+ D artifacts/m14/qemu_m14.log
+?? ../backup/restore_m12/
+?? artifacts/m14_final_sha256.txt
+?? artifacts/m14_git_status_after_m14.txt
+?? linker.ld.backup_m14
+?? linker.ld.bak
+?? makefile.backup_m14
+?? makefile.bak
+?? src/kernel/arch/x86_64/boot.s.bak
+?? ../mcsos_final/
