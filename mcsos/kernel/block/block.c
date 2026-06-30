@@ -3,6 +3,17 @@
 static mcsos_blk_device_t *g_blk_devices[MCSOS_BLK_MAX_DEVICES];
 static uint32_t g_blk_count;
 
+mcsos_blk_stats_t g_mcsos_blk_stats;
+
+void mcsos_blk_stats_reset(void) {
+    g_mcsos_blk_stats.reads = 0;
+    g_mcsos_blk_stats.writes = 0;
+    g_mcsos_blk_stats.flushes = 0;
+    g_mcsos_blk_stats.cache_hits = 0;
+    g_mcsos_blk_stats.cache_misses = 0;
+    g_mcsos_blk_stats.evictions = 0;
+}
+
 static int mcsos_is_power_of_two_u32(uint32_t value) {
     return value != 0u && (value & (value - 1u)) == 0u;
 }
@@ -79,7 +90,11 @@ mcsos_blk_status_t mcsos_blk_read(mcsos_blk_device_t *dev, uint64_t lba, uint32_
     if (dev->ops->read == 0) {
         return MCSOS_BLK_EINVAL;
     }
-    return dev->ops->read(dev, lba, count, buffer);
+    mcsos_blk_status_t rst = dev->ops->read(dev, lba, count, buffer);
+    if (rst == MCSOS_BLK_OK) {
+        g_mcsos_blk_stats.reads++;
+    }
+    return rst;
 }
 
 mcsos_blk_status_t mcsos_blk_write(mcsos_blk_device_t *dev, uint64_t lba, uint32_t count, const void *buffer) {
@@ -90,7 +105,11 @@ mcsos_blk_status_t mcsos_blk_write(mcsos_blk_device_t *dev, uint64_t lba, uint32
     if (dev->ops->write == 0) {
         return MCSOS_BLK_EINVAL;
     }
-    return dev->ops->write(dev, lba, count, (void *)buffer);
+    mcsos_blk_status_t wst = dev->ops->write(dev, lba, count, (void *)buffer);
+    if (wst == MCSOS_BLK_OK) {
+        g_mcsos_blk_stats.writes++;
+    }
+    return wst;
 }
 
 mcsos_blk_status_t mcsos_blk_flush(mcsos_blk_device_t *dev) {
@@ -100,9 +119,24 @@ mcsos_blk_status_t mcsos_blk_flush(mcsos_blk_device_t *dev) {
     if (dev->ops->flush == 0) {
         return MCSOS_BLK_OK;
     }
-    return dev->ops->flush(dev, 0, 0, 0);
+    mcsos_blk_status_t fst = dev->ops->flush(dev, 0, 0, 0);
+    if (fst == MCSOS_BLK_OK) {
+        g_mcsos_blk_stats.flushes++;
+    }
+    return fst;
 }
 
 void mcsos_blk_copy_name_for_driver(char dst[MCSOS_BLK_NAME_MAX], const char *src) {
     mcsos_copy_name(dst, src);
+}
+
+void mcsos_blk_dump_devices(void (*log_fn)(char *)) {
+    if (log_fn == 0) {
+        return;
+    }
+    for (uint32_t i = 0; i < g_blk_count; i++) {
+        log_fn("[M14] device: ");
+        log_fn(g_blk_devices[i]->name);
+        log_fn("\n");
+    }
 }

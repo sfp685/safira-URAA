@@ -61,6 +61,13 @@ int main(void) {
     EXPECT_OK(mcsos_blk_read(&dev, 5u, 1u, out));
     EXPECT_EQ(memcmp(tmp, out, sizeof(tmp)), 0);
 
+    {
+        mcsos_blk_device_t bad_dev;
+        mcsos_ramblk_t bad_ram;
+        uint8_t bad_backing[512u * 4u];
+        EXPECT_STATUS(mcsos_ramblk_init(&bad_dev, &bad_ram, "badblk", bad_backing, sizeof(bad_backing), 700u), MCSOS_BLK_EINVAL);
+    }
+
     printf("M14 host tests PASS\n");
     return 0;
 }

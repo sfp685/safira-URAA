@@ -45,6 +45,7 @@ static mcsos_blk_status_t mcsos_bcache_select_victim(mcsos_bcache_t *cache, mcso
     }
     uint32_t idx = start;
     cache->clock_hand = idx + 1u;
+    g_mcsos_blk_stats.evictions++;
     mcsos_blk_status_t st = mcsos_bcache_flush_entry(&cache->entries[idx]);
     if (st != MCSOS_BLK_OK) {
         return st;
@@ -66,6 +67,7 @@ mcsos_blk_status_t mcsos_bcache_init(mcsos_bcache_t *cache,
     cache->data_pool = data_pool;
     cache->block_size = block_size;
     cache->clock_hand = 0;
+    cache->write_through = 0;
     for (uint32_t i = 0; i < entry_count; i++) {
         entries[i].data = data_pool + ((uint64_t)i * (uint64_t)block_size);
         entries[i].capacity = block_size;
@@ -85,7 +87,11 @@ mcsos_blk_status_t mcsos_bcache_read(mcsos_bcache_t *cache,
         return MCSOS_BLK_EINVAL;
     }
     mcsos_bcache_entry_t *e = mcsos_bcache_find(cache, dev, lba);
+    if (e != 0) {
+        g_mcsos_blk_stats.cache_hits++;
+    }
     if (e == 0) {
+        g_mcsos_blk_stats.cache_misses++;
         mcsos_blk_status_t st = mcsos_bcache_select_victim(cache, &e);
         if (st != MCSOS_BLK_OK) {
             return st;
@@ -124,6 +130,13 @@ mcsos_blk_status_t mcsos_bcache_write(mcsos_bcache_t *cache,
     }
     mcsos_memcpy_u8_bcache(e->data, buffer, cache->block_size);
     e->dirty = 1;
+    if (cache->write_through) {
+        mcsos_blk_status_t wst = mcsos_blk_write(dev, lba, 1u, e->data);
+        if (wst != MCSOS_BLK_OK) {
+            return wst;
+        }
+        e->dirty = 0;
+    }
     return MCSOS_BLK_OK;
 }
 
@@ -138,4 +151,11 @@ mcsos_blk_status_t mcsos_bcache_flush_all(mcsos_bcache_t *cache) {
         }
     }
     return MCSOS_BLK_OK;
+}
+
+void mcsos_bcache_set_write_through(mcsos_bcache_t *cache, int enable) {
+    if (cache == 0) {
+        return;
+    }
+    cache->write_through = enable;
 }

@@ -59,6 +59,7 @@ typedef struct mcsos_bcache {
     uint8_t *data_pool;
     uint32_t block_size;
     uint64_t clock_hand;
+    int write_through;
 } mcsos_bcache_t;
 
 void mcsos_blk_registry_reset(void);
@@ -90,5 +91,20 @@ mcsos_blk_status_t mcsos_bcache_write(mcsos_bcache_t *cache,
                                       uint64_t lba,
                                       const void *buffer);
 mcsos_blk_status_t mcsos_bcache_flush_all(mcsos_bcache_t *cache);
+void mcsos_blk_dump_devices(void (*log_fn)(char *));
 void mcsos_blk_copy_name_for_driver(char dst[MCSOS_BLK_NAME_MAX], const char *src);
 #endif
+
+typedef struct mcsos_blk_stats {
+    uint64_t reads;
+    uint64_t writes;
+    uint64_t flushes;
+    uint64_t cache_hits;
+    uint64_t cache_misses;
+    uint64_t evictions;
+} mcsos_blk_stats_t;
+
+extern mcsos_blk_stats_t g_mcsos_blk_stats;
+void mcsos_blk_stats_reset(void);
+
+void mcsos_bcache_set_write_through(mcsos_bcache_t *cache, int enable);
