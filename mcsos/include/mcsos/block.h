@@ -90,5 +90,5 @@ mcsos_blk_status_t mcsos_bcache_write(mcsos_bcache_t *cache,
                                       uint64_t lba,
                                       const void *buffer);
 mcsos_blk_status_t mcsos_bcache_flush_all(mcsos_bcache_t *cache);
-
+void mcsos_blk_copy_name_for_driver(char dst[MCSOS_BLK_NAME_MAX], const char *src);
 #endif
