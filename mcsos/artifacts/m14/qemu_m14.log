@@ -12,4 +12,4 @@ Booting from DVD/CD...
 [H[J[1;1HHalo Safira, Kernel M6 berhasil jalan!
 M14: block layer initialized
 [M14] block device registered: ram0
-qemu-system-x86_64: terminating on signal 15 from pid 17812 (timeout)
+qemu-system-x86_64: terminating on signal 15 from pid 17839 (timeout)
