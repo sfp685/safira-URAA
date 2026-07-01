@@ -1,0 +1,10 @@
+=== M15 Fault Injection Tests ===
+[PASS] corrupt_magic: fsck detects CORRUPT
+[PASS] root_bad_mode: mount detects CORRUPT
+[PASS] root_bad_mode: fsck detects CORRUPT
+[PASS] dirent_free_inode: fsck detects CORRUPT
+[PASS] direct_out_of_range: fsck detects CORRUPT
+[PASS] name_too_long: create rejects NAMETOOLONG
+[PASS] write_too_large: write rejects RANGE
+[PASS] dir_full: 17th create rejects NOSPC
+All fault injection tests PASSED

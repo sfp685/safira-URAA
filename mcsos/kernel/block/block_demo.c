@@ -30,3 +30,6 @@ void block_demo_run(void) {
     serial_write_string(g_ram0_dev.name);
     serial_write_string("\n");
 }
+mcsos_blk_device_t *block_demo_get_dev(void) {
+    return &g_ram0_dev;
+}

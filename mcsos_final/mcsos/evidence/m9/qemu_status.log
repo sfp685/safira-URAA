@@ -1,0 +1,5 @@
+Host unit test: PASS
+Freestanding compile: OK  
+Kernel ELF built: OK
+QEMU: GRUB load kernel tapi ELF64+Multiboot2 execution terkendala mode CPU
+grub-file --is-x86-multiboot2: exit 0 (header valid)

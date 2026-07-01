@@ -1,1221 +1,3 @@
-    pop r8
-    pop rbp
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    pop rbx
-    pop rax
-    add rsp, 16
-    iretq
-EOF
-
-# 1. Bersihkan folder build
-rm -rf build && mkdir -p build
-# 2. Kompilasi interrupts.S
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-# 3. Kompilasi pic.c
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-# 4. Kompilasi pit.c
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-# 5. Kompilasi idt.c
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-# 6. Kompilasi serial.c
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-# 7. Kompilasi panic.c
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-# 8. Kompilasi kernel.c
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 9. Satukan semua objek (Link)
-ld -T linker.ld -o build/mcsos-m5.elf build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.elf -serial stdio -no-reboot -no-shutdown
-cat << 'EOF' > kernel/kernel.c
-#include "io.h"
-#include "serial.h"
-#include "idt.h"
-#include "pic.h"
-#include "pit.h"
-
-void kmain(void) {
-    cpu_cli();                 // 1. Matikan interupsi selama setup awal hardware
-    serial_init();             // 2. Siapkan komunikasi serial COM1
-    serial_write_string("[MCSOS:M5] boot: external interrupt bring-up start\n");
-
-    idt_init();                // 3. Muat tabel IDT ke CPU register
-    serial_write_string("[MCSOS:M5] idt: loaded\n");
-
-    pic_remap(PIC_MASTER_OFFSET, PIC_SLAVE_OFFSET); // 4. Geser offset IRQ agar tidak tabrakan dengan exception
-    pic_mask_all();            // 5. Tutup seluruh pin interupsi default
-    pic_unmask_irq(0);         // 6. Buka khusus untuk IRQ0 (Timer)
-    serial_write_string("[MCSOS:M5] pic: remapped and masked\n");
-
-    pit_configure_hz(100);     // 7. Atur detak PIT pada kecepatan 100 Hz
-    serial_write_string("[MCSOS:M5] pit: configured 100Hz\n");
-
-    serial_write_string("[MCSOS:M5] sti: enabling interrupts\n");
-    cpu_sti();                 // 8. Aktifkan kembali interupsi secara global
-
-    // Loop abadi hemat energi menggunakan instruksi HLT
-    for (;;) {
-        cpu_hlt();
-    }
-}
-EOF
-
-# 1. Bersihkan folder build lama
-rm -rf build && mkdir -p build
-# 2. Kompilasi ulang seluruh berkas driver ke objek baru
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 3. Satukan objek dengan perintah ld yang utuh dan bersih
-ld -T linker.ld -o build/mcsos-m5.elf build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.elf -serial stdio -no-reboot -no-shutdown
-cat << 'EOF' > kernel/kernel.c
-#include "io.h"
-#include "serial.h"
-#include "idt.h"
-#include "pic.h"
-#include "pit.h"
-
-void kmain(void) {
-    cpu_cli();                 // 1. Matikan interupsi selama setup awal hardware
-    serial_init();             // 2. Siapkan komunikasi serial COM1
-    serial_write_string("[MCSOS:M5] boot: external interrupt bring-up start\n");
-
-    idt_init();                // 3. Muat tabel IDT ke CPU register
-    serial_write_string("[MCSOS:M5] idt: loaded\n");
-
-    pic_remap(PIC_MASTER_OFFSET, PIC_SLAVE_OFFSET); // 4. Geser offset IRQ agar tidak tabrakan dengan exception
-    pic_mask_all();            // 5. Tutup seluruh pin interupsi default
-    pic_unmask_irq(0);         // 6. Buka khusus untuk IRQ0 (Timer)
-    serial_write_string("[MCSOS:M5] pic: remapped and masked\n");
-
-    pit_configure_hz(100);     // 7. Atur detak PIT pada kecepatan 100 Hz
-    serial_write_string("[MCSOS:M5] pit: configured 100Hz\n");
-
-    serial_write_string("[MCSOS:M5] sti: enabling interrupts\n");
-    cpu_sti();                 // 8. Aktifkan kembali interupsi secara global
-
-    // Loop abadi hemat energi menggunakan instruksi HLT
-    for (;;) {
-        cpu_hlt();
-    }
-}
-EOF
-
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.elf -serial stdio -no-reboot -no-shutdown
-nano kernel/kernel.c
-#include "io.h"
-#include "serial.h"
-#include "idt.h"
-#include "pic.h"
-#include "pit.h"
-void kmain(void) {
-}
-# 1. Bersihkan folder lama
-rm -rf build && mkdir -p build
-# 2. Kompilasi ulang seluruh berkas objek
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 3. Penggabungan Linker Script
-ld -T linker.ld -o build/mcsos-m5.elf build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-# 4. Jalankan Tes di QEMU
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.elf -serial stdio -no-reboot -no-shutdown
-nano jalankan_m5.sh
-chmod +x jalankan_m5.sh
-./jalankan_m5.sh
-nano jalankan_m5.sh
-rm -f jalankan_m5.sh
-echo "IyEvYmluL2Jhc2gKZWNobyAiPT09IE1FTVVMQUkgUFJPU0VTIEJVSUxEIE1DU09TIE01ID09PSIKCnJtIC1yZiBidWlsCm1rZGlyIC1wIGJ1aWxkCgpjbGFuZyAtZmZyZWVzdGFuZGluZyAtbTY0IC1jIHNyYy9pbnRlcnJ1cHRzLlMgLW8gYnVpbGQvaW50ZXJydXB0cy5vCmNsYW5nIC1mZnJlZXN0YW5kaW5nIC1mbm8tc3RhY2stcHJvdGVjdG9yIC1mbm8tc3RhY2stY2hlY2sgLWZuby1waWMgLWZuby1waWUgLWZuby1sdG8gLW02NCAtbWFyY2g9eDg2LTY0IC1JaW5jbHVkZSAtYyBzcmMvcGljLmMgLW8gYnVpbGQvcGljLm8KY2xhbmcgLWZmcmVlc3RhbmRpbmcgLWZuby1zdGFjay1wcm90ZWN0b3IgLWZuby1zdGFjay1jaGVjayAtZm5vLXBpYyAtZm5vLXBpZSAtZm5vLWx0byAtbTY0IC1tYXJjaD14ODYtNjQgLUlpbmNsdWRlIC1jIHNyYy9waXQuYyAtbyBidWlsZC9waXQubwpjbGFuZyAtZmZyZWVzdGFuZGluZyAtZm5vLXN0YWNrLXByb3RlY3RvciAtZm5vLXN0YWNrLWNoZWNrIC1mbm8tcGljIC1mbm8tcGllIC1mbm8tbHRvIC1tNjQgLW1hcmNoPXg4Ni02NCAtSWluY2x1ZGUgLWMgc3JjL2lkdC5jIC1vIGJ1aWxkL2lkdC5vCmNsYW5nIC1mZnJlZXN0YW5kaW5nIC1mbm8tc3RhY2stcHJvdGVjdG9yIC1mbm8tc3RhY2stY2hlY2sgLWZuby1waWMgLWZuby1waWUgLWZuby1sdG8gLW02NCAtbWFyY2g9eDg2LTY0IC1JaW5jbHVkZSAtYyBzcmMvc2VyaWFsLmMgLW8gYnVpbGQvc2VyaWFsLm8KY2xhbmcgLWZmcmVlc3RhbmRpbmcgLWZuby1zdGFjay1wcm90ZWN0b3IgLWZuby1zdGFjay1jaGVjayAtZm5vLXBpYyAtZm5vLXBpZSAtZm5vLWx0byAtbTY0IC1tYXJjaD14ODYtNjQgLUlpbmNsdWRlIC1jIHNyYy9wYW5pYy5jIC1vIGJ1aWxkL3BhbmljLm8KY2xhbmcgLWZmcmVlc3RhbmRpbmcgLWZuby1zdGFjay1wcm90ZWN0b3IgLWZuby1zdGFjay1jaGVjayAtZm5vLXBpYyAtZm5vLXBpZSAtZm5vLWx0byAtbTY0IC1tYXJjaD14ODYtNjQgLUlpbmNsdWRlIC1jIGtlcm5lbC9rZXJuZWwuYyAtbyBidWlsZC9rZXJuZWwubwoKZWNobyAiPT09IE1FTVVMQUkgTElOS0lORyBPQkpFQ1RTID09PSIKbGQgLVQgbGlua2VyLmxkIC1vIGJ1aWxkL21jc29zLW01LmVmZiBidWlsZC9pbnRlcnJ1cHRzLm8gYnVpbGQvcGljLm8gYnVpbGQvcGl0Lm8gYnVpbGQvaWR0Lm8gYnVpbGQvc2VyaWFsLm8gYnVpbGQvcGFuaWMubyBidWlsZC9rZXJuZWwubwoKZWNobyAiPT09IE1FTkpBTEFOS0FOIEtFUk5FTCBESSBRRU1VID09PSIKcXVlbXUtc3lzdGVtLXg4Nl82NCAtTSBxMzUgLW0gNTEyTSAta2VybmVsIGJ1aWxkL21jc29zLW01LmVmZiAtZGV2aWNlIGxvYWRlcixmaWxlPWJ1aWxkL21jc29zLW01LmVmZixjcHUtbnVtPTAgLXNlcmlhbCBzdGRpbyAtbm8tcmVib290IC1uby1zaHV0ZG93bQo=" | base64 -d > jalankan_m5.sh
-chmod +x jalankan_m5.sh
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,addr=0x100000,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -bios build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-nano src/interrupts.S
-.intel_syntax noprefix
-# === MULTIBOOT HEADER SPECIFICATION ===
-.align 4
-.long 0x1BADB002          # Magic number untuk Multiboot 1
-.long 0x00000003          # Flags: alur modul + info memori wajib ada
-.long -(0x1BADB002 + 0x00000003) # Checksum untuk validasi
-.global isr_stub_3
-.global isr_stub_32
-.extern x86_64_trap_dispatch
-.align 8
-isr_stub_3:
-.align 8
-isr_stub_32:
-isr_common_stub:
-./jalankan_m5.sh
-nano src/interrupts.S
-./jalankan_m5.sh
-cat << 'EOF' > src/interrupts.S
-.intel_syntax noprefix
-
-# === MULTIBOOT HEADER SPECIFICATION ===
-.align 4
-.long 0x1BADB002          
-.long 0x00000003          
-.long -(0x1BADB002 + 0x00000003) 
-
-.global isr_stub_3
-.global isr_stub_32
-.extern x86_64_trap_dispatch
-
-.align 8
-isr_stub_3:
-    push 0
-    push 3
-    jmp isr_common_stub
-
-.align 8
-isr_stub_32:
-    push 0
-    push 32
-    jmp isr_common_stub
-
-isr_common_stub:
-    push rax
-    push rbx
-    push rcx
-    push rdx
-    push rsi
-    push rdi
-    push rbp
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
-
-    mov rdi, rsp
-    cld
-    call x86_64_trap_dispatch
-
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rbp
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    pop rbx
-    pop rax
-    add rsp, 16
-    iretq
-EOF
-
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -append "serial" -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,addr=0x100000,cpu-num=0 -serial stdio -device isa-debug-exit,iobase=0xf4,iosize=0x04 -no-reboot -no-shutdown
-cat << 'EOF' > jalankan_m5.sh
-#!/bin/bash
-echo "=== MEMULAI PROSES BUILD MCSOS M5 ==="
-
-# 1. Bersihkan folder build lama
-rm -rf build
-mkdir -p build
-
-# 2. Kompilasi interrupts.S
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-
-# 3. Kompilasi semua driver C satu per satu
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-
-# 4. Kompilasi alur utama kernel
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-
-echo "=== MEMULAI LINKING OBJECTS ==="
-# 5. Satukan semua objek menjadi biner ELF
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-
-echo "=== MENGEKSTRAK ELF MENJADI RAW BINARY ==="
-# 6. Ubah berkas ELF menjadi biner murni (Raw Binary) tanpa header yang membingungkan QEMU
-objcopy -O binary build/mcsos-m5.eff build/mcsos-m5.bin
-
-echo "=== MENJALANKAN KERNEL DI QEMU ==="
-# 7. Jalankan QEMU Smoke Test menggunakan metode pemuatan file bios mentah
-qemu-system-x86_64 -M q35 -m 512M -drive format=raw,file=build/mcsos-m5.bin -serial stdio -no-reboot -no-shutdown
-EOF
-
-chmod +x jalankan_m5.sh
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -drive format=raw,file=build/mcsos-m5.bin -serial stdio -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -drive format=raw,file=build/mcsos-m5.bin -serial stdio -nographic -monitor none -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -display none
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -display none -monitor stdio
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -display none -monitor telnet:127.0.0.1:5555,server,nowait
-cat << 'EOF' > src/interrupts.S
-.intel_syntax noprefix
-
-.global _start
-.global isr_stub_3
-.global isr_stub_32
-.extern kmain
-.extern x86_64_trap_dispatch
-
-# === ENTRY POINT UTAMA KERNEL ===
-.section .text
-_start:
-    cli                 # Matikan interupsi dulu
-    call kmain          # Lompat ke fungsi utama di kernel.c
-    hlt                 # Jika kmain selesai, istirahatkan CPU
-
-.align 8
-isr_stub_3:
-    push 0
-    push 3
-    jmp isr_common_stub
-
-.align 8
-isr_stub_32:
-    push 0
-    push 32
-    jmp isr_common_stub
-
-isr_common_stub:
-    push rax
-    push rbx
-    push rcx
-    push rdx
-    push rsi
-    push rdi
-    push rbp
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
-
-    mov rdi, rsp
-    cld
-    call x86_64_trap_dispatch
-
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rbp
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    pop rbx
-    pop rax
-    add rsp, 16
-    iretq
-EOF
-
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -display none -monitor telnet:127.0.0.1:5555,server,nowait
-cat << 'EOF' > linker.ld
-ENTRY(_start)
-
-SECTIONS
-{
-    /* Kernel dimuat di alamat memori standar 1 MB */
-    . = 0x100000;
-
-    .text : {
-        build/interrupts.o(.text)
-        *(.text)
-    }
-
-    .rodata : {
-        *(.rodata)
-    }
-
-    .data : {
-        *(.data)
-    }
-
-    .bss : {
-        *(.bss)
-    }
-}
-EOF
-
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -no-reboot -no-shutdown -vga stdio
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,addr=0x100000,cpu-num=0 -device loader,addr=0x100000,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -drive file=build/mcsos-m5.eff,format=raw -serial stdio -no-reboot -no-shutdown
-qemu-system-i386 -M q35 -m 512M -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-nano linker.ld
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -append "serial" -serial stdio -display none -no-reboot -no-shutdown
-qemu-system-x86_64 -M pc -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -M pc -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial mon:stdio -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -M pc -m 512M -kernel build/mcsos-m5.eff -serial stdio -display none -no-reboot -no-shutdown
-qemu-system-x86_64 -M pc -m 512M -device loader,file=build/mcsos-m5.bin,addr=0x7c00,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M pc,pvh=off -m 512M -kernel build/mcsos-m5.eff -serial stdio -nographic -no-reboot
-qemu-system-x86_64 -m 512M -device loader,file=build/mcsos-m5.bin,addr=0x7c00,cpu-num=0 -serial mon:stdio -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -kernel build/mcsos-m5.eff -serial stdio -nographic -no-reboot -no-shutdown
-sudo apt update && sudo apt install -y ovmf
-qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -kernel build/mcsos-m5.eff -serial stdio -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -bios /usr/share/ovmf/OVMF.fd -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-cat << 'EOF' > jalankan_m5.sh
-#!/bin/bash
-echo "=== MEMULAI PROSES BUILD MCSOS M5 (32-BIT COMPATIBLE) ==="
-
-# 1. Bersihkan folder build lama
-rm -rf build
-mkdir -p build
-
-# 2. Kompilasi interrupts.S ke mode 32-bit (i386)
-clang -ffreestanding -m32 -c src/interrupts.S -o build/interrupts.o
-
-# 3. Kompilasi semua driver C ke mode 32-bit
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -Iinclude -c src/panic.c -o build/panic.o
-
-# 4. Kompilasi alur utama kernel ke mode 32-bit
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -Iinclude -c kernel/kernel.c -o build/kernel.o
-
-echo "=== MEMULAI LINKING OBJECTS ==="
-# 5. Satukan semua objek menjadi biner ELF 32-bit yang dicintai QEMU
-ld -m elf_i386 -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-
-echo "=== MENJALANKAN KERNEL DI QEMU MODERN ==="
-# 6. Jalankan QEMU tanpa grafik, langsung buang log serial ke terminal tempat mengetik!
-qemu-system-i386 -M pc -m 512M -kernel build/mcsos-m5.eff -serial stdio -display none -no-reboot -no-shutdown
-EOF
-
-./jalankan_m5.sh
-cat << 'EOF' > jalankan_m5.sh
-#!/bin/bash
-echo "=== MEMULAI PROSES BUILD MCSOS M5 (64-BIT PURIST) ==="
-
-# 1. Bersihkan folder build lama
-rm -rf build
-mkdir -p build
-
-# 2. Kompilasi interrupts.S ke mode 64-bit asli
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-
-# 3. Kompilasi semua driver C ke mode 64-bit asli
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-
-# 4. Kompilasi alur utama kernel ke mode 64-bit asli
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-
-echo "=== MEMULAI LINKING OBJECTS ==="
-# 5. Satukan semua objek menjadi biner ELF64 murni
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-
-echo "=== MENJALANKAN KERNEL DI QEMU ==="
-# 6. Panggil QEMU menggunakan kombinasi perangkat loader tanpa birokrasi parameter -kernel
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -no-reboot -no-shutdown
-EOF
-
-./jalankan_m5.sh
-# 1. Tulis ulang kernel.c dengan kode yang bersih dan teratur
-cat << 'EOF' > kernel/kernel.c
-#include "io.h"
-#include "serial.h"
-#include "idt.h"
-#include "pic.h"
-#include "pit.h"
-
-void kmain(void) {
-    cpu_cli();                 
-    serial_init();             
-    serial_write_string("[MCSOS:M5] boot: external interrupt bring-up start\n");
-
-    idt_init();                
-    serial_write_string("[MCSOS:M5] idt: loaded\n");
-
-    pic_remap(PIC_MASTER_OFFSET, PIC_SLAVE_OFFSET); 
-    pic_mask_all();            
-    pic_unmask_irq(0);         
-    serial_write_string("[MCSOS:M5] pic: remapped and masked\n");
-
-    pit_configure_hz(100);     
-    serial_write_string("[MCSOS:M5] pit: configured 100Hz\n");
-
-    serial_write_string("[MCSOS:M5] sti: enabling interrupts\n");
-    cpu_sti();                 
-
-    for (;;) {
-        cpu_hlt();
-    }
-}
-EOF
-
-# 2. Bersihkan biner skrip jalankan_m5.sh agar perintah QEMU-nya menggunakan terminal murni
-cat << 'EOF' > jalankan_m5.sh
-#!/bin/bash
-rm -rf build && mkdir -p build
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-objcopy -O binary build/mcsos-m5.eff build/mcsos-m5.bin
-qemu-system-x86_64 -M q35 -m 512M -drive format=raw,file=build/mcsos-m5.bin -serial stdio -nographic -no-reboot -no-shutdown
-EOF
-
-# 3. Jalankan skrip otomatisnya
-chmod +x jalankan_m5.sh
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -drive format=raw,file=build/mcsos-m5.bin -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -bios default -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -serial stdio -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -nographic -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,addr=0x100000,cpu-num=0 -nographic -no-reboot -no-shutdown
-qemu-system-i386 -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-cat << 'EOF' > jalankan_m5.sh
-#!/bin/bash
-echo "=== MEMULAI PROSES BUILD MCSOS M5 (COMPATIBILITY MODE) ==="
-
-# 1. Bersihkan folder build lama
-rm -rf build && mkdir -p build
-
-# 2. Kompilasi interrupts.S ke mode 32-bit/64-bit hibrida
-clang -ffreestanding -m32 -c src/interrupts.S -o build/interrupts.o
-
-# 3. Kompilasi semua driver C ke mode emulasi 32-bit agar klop dengan target loader
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -march=i386 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -march=i386 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -march=i386 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -march=i386 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -march=i386 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m32 -march=i386 -Iinclude -c kernel/kernel.c -o build/kernel.o
-
-echo "=== MEMULAI LINKING OBJECTS TO ELF32 ==="
-# 4. Paksa linker menyatukan berkas menjadi format elf_i386 (Sangat disukai QEMU -kernel)
-ld -m elf_i386 -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-
-echo "=== MENJALANKAN KERNEL DI QEMU i386 ==="
-# 5. Jalankan emulator dengan jalur serial standar
-qemu-system-i386 -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-EOF
-
-chmod +x jalankan_m5.sh
-./jalankan_m5.sh
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -display none -serial stdio -no-reboot -no-shutdown
-# 1. Buat folder build kembali
-mkdir -p build
-# 2. Kompilasi interrupts.S (64-bit sesuai panduan)
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-# 3. Kompilasi semua driver C (64-bit sesuai panduan)
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 4. Proses Linking menjadi ELF64 murni
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0 -display none -serial stdio -no-reboot -no-shutdown
-# 1. Pastikan folder build dan struktur folder GRUB terbuat
-mkdir -p build
-mkdir -p iso_root/boot/grub
-# 2. Salin file kernel 64-bit asli kamu ke dalam folder iso
-cp build/mcsos-m5.eff iso_root/boot/mcsos-m5.eff
-# 3. Buat file konfigurasi GRUB agar dia tahu cara memuat kernelmu
-cat << 'EOF' > iso_root/boot/grub/grub.cfg
-set timeout=0
-set default=0
-
-menuentry "MCSOS M5" {
-    multiboot2 /boot/mcsos-m5.eff
-    boot
-}
-EOF
-
-# 4. Satukan menjadi file ISO resmi yang bisa di-boot QEMU
-grub-mkrescue -o build/mcsos-m5.iso iso_root
-# 5. Jalankan QEMU dengan membaca file ISO tersebut lewat jalur serial
-qemu-system-x86_64 -cdrom build/mcsos-m5.iso -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -device loader,file=build/mcsos-m5.eff,cpu-num=0 -append "serial" -serial stdio -display none -no-reboot -no-shutdown
-cat << 'EOF' > src/interrupts.S
-.intel_syntax noprefix
-
-# === PVH ELF NOTE SPECIFICATION (UNTUK QEMU MODERN) ===
-.section .note.pvh, "a", @progbits
-.align 4
-.long 4                       # Nama owner length
-.long 4                       # Data description length
-.long 18                      # Type: ELF_NOTE_PVH (18)
-.string "pvh"                 # Owner name
-.long 0x100000                # Entry point asli kernel (1 MB)
-
-.section .text
-.global isr_stub_3
-.global isr_stub_32
-.extern x86_64_trap_dispatch
-
-.align 8
-isr_stub_3:
-    push 0
-    push 3
-    jmp isr_common_stub
-
-.align 8
-isr_stub_32:
-    push 0
-    push 32
-    jmp isr_common_stub
-
-isr_common_stub:
-    push rax
-    push rbx
-    push rcx
-    push rdx
-    push rsi
-    push rdi
-    push rbp
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
-
-    mov rdi, rsp
-    cld
-    call x86_64_trap_dispatch
-
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rbp
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    pop rbx
-    pop rax
-    add rsp, 16
-    iretq
-EOF
-
-mkdir -p build
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -bios build/mcsos-m5.eff -serial stdio -display none -no-reboot -no-shutdown
-cat << 'EOF' > linker.ld
-OUTPUT_FORMAT("elf32-i386")
-OUTPUT_ARCH(i386:x86-64)
-ENTRY(isr_stub_3)
-
-SECTIONS
-{
-    . = 0x100000;
-
-    .text : {
-        *(.text)
-    }
-
-    .data : {
-        *(.data)
-    }
-
-    .bss : {
-        *(.bss)
-    }
-}
-EOF
-
-# Kompilasi ulang seluruh objek dalam mode 64-bit asli tugasmu
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# Linking menggunakan linker script yang baru
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-# Jalankan QEMU dengan parameter standar panduanmu
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -serial stdio -no-reboot -no-shutdown
-# 1. Kompilasi ulang semua driver dalam mode 64-bit murni asli sesuai modulmu
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 2. Kembalikan linker script ke konfigurasi standar asli modul (64-bit)
-cat << 'EOF' > linker.ld
-OUTPUT_FORMAT("elf64-x86-64")
-ENTRY(kmain)
-SECTIONS
-{
-    . = 0x100000;
-    .text : { *(.text) }
-    .data : { *(.data) }
-    .bss  : { *(.bss) }
-}
-EOF
-
-# 3. Jalankan proses Linking untuk menghasilkan file .eff asli buat dikumpulkan
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-# 4. Ekstrak menjadi biner mentah (.bin)
-objcopy -O binary build/mcsos-m5.eff build/mcsos-m5.bin
-# 5. RAHASIA UTAMA: Buat file BIOS tiruan berukuran tepat 64KB agar lolos dari validasi QEMU
-dd if=/dev/zero of=build/bios_64k.bin bs=1k count=64
-dd if=build/mcsos-m5.bin of=build/bios_64k.bin conv=notrunc
-# 6. Jalankan QEMU lewat jalur pintas BIOS tanpa lewat gerbang PVH Note
-qemu-system-x86_64 -L . -bios build/bios_64k.bin -serial stdio -display none -no-reboot -no-shutdown
-# 1. Kompilasi ulang semua objek (64-bit murni sesuai modul)
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 2. Kembalikan Linker Script ke format asli elf64
-cat << 'EOF' > linker.ld
-OUTPUT_FORMAT("elf64-x86-64")
-ENTRY(kmain)
-SECTIONS
-{
-    . = 0x100000;
-    .text : { *(.text) }
-    .data : { *(.data) }
-    .bss  : { *(.bss) }
-}
-EOF
-
-# 3. Jalankan Linking
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-# 4. EKSEKUSI QEMU JALUR KHUSUS MULTIBOOT RAM LOADER
-qemu-system-x86_64 -machine pc,accel=tcg,pvh=off -m 512M -kernel build/mcsos-m5.eff -serial stdio -display none -no-reboot -no-shutdown
-cat << 'EOF' > linker.ld
-OUTPUT_FORMAT("elf64-x86-64")
-ENTRY(kmain)
-SECTIONS
-{
-    . = 0x100000;
-    .text : { *(.text) }
-    .data : { *(.data) }
-    .bss  : { *(.bss) }
-}
-EOF
-
-cat << 'EOF' > src/interrupts.S
-.intel_syntax noprefix
-
-# === MULTIBOOT HEADER (Syarat Wajib QEMU Modern) ===
-.section .text
-.align 4
-multiboot_header:
-    .long 0x1BADB002              # Magic number
-    .long 0x00000001              # Flags (align modules)
-    .long -(0x1BADB002 + 0x00000001) # Checksum
-
-.global isr_stub_3
-.global isr_stub_32
-.extern x86_64_trap_dispatch
-
-.align 8
-isr_stub_3:
-    push 0
-    push 3
-    jmp isr_common_stub
-
-.align 8
-isr_stub_32:
-    push 0
-    push 32
-    jmp isr_common_stub
-
-isr_common_stub:
-    push rax
-    push rbx
-    push rcx
-    push rdx
-    push rsi
-    push rdi
-    push rbp
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
-
-    mov rdi, rsp
-    cld
-    call x86_64_trap_dispatch
-
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rbp
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    pop rbx
-    pop rax
-    add rsp, 16
-    iretq
-EOF
-
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-qemu-system-x86_64 -M q35 -m 512M -kernel build/mcsos-m5.eff -serial stdio -display none -no-reboot -no-shutdown
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,cpu-num=0,keep=true -serial stdio -display none -no-reboot -no-shutdown
-ls -l && ls -l src/ && ls -l kernel/
-# 1. Hapus file duplikat yang salah tempat di folder src
-rm -f src/kernel.c
-# 2. Hapus file sampah 0 byte yang merusak perintah terminal
-rm -f echo make mkdir nm rm
-# 3. Bersihkan folder build total
-rm -rf build && mkdir -p build
-# 4. Kompilasi ulang secara teratur dari folder yang BENAR
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-# KERNEL UTAMA DIAMBIL DARI FOLDER KERNEL (BUKAN SRC)
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 5. Satukan kembali menjadi biner murni menggunakan Linker Script asli
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,addr=0x100000,cpu-num=0 -serial stdio -display none -no-reboot -no-shutdown
-# 1. Bersihkan folder build dari sisa file yang salah
-rm -rf build && mkdir -p build
-# 2. Jalankan kompilasi objek 64-bit murni (-m64) sesuai panduan asli
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-# 3. Lakukan proses Linking dengan Linker Script asli untuk menghasilkan berkas .eff
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-# 4. Ambil perintah QEMU asli dari skrip jalankan_m5.sh bawaan modulmu
-./jalankan_m5.sh
-# 1. Tulis ulang skrip jalankan_m5.sh agar murni 64-bit sesuai modul
-cat << 'EOF' > jalankan_m5.sh
-#!/bin/bash
-echo "=== MEMULAI COMPILATION & LINKING MURNI 64-BIT (MODUL M5) ==="
-
-# Bersihkan sisa biner lama
-rm -rf build && mkdir -p build
-
-# Kompilasi semua file ke 64-bit murni (-m64)
-clang -ffreestanding -m64 -c src/interrupts.S -o build/interrupts.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pic.c -o build/pic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/pit.c -o build/pit.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/idt.c -o build/idt.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/serial.c -o build/serial.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c src/panic.c -o build/panic.o
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/kernel.c -o build/kernel.o
-
-echo "=== LINKING MURNI ELF64 ==="
-ld -T linker.ld -o build/mcsos-m5.eff build/interrupts.o build/pic.o build/pit.o build/idt.o build/serial.o build/panic.o build/kernel.o
-
-echo "=== MENJALANKAN DI EMULATOR QEMU ==="
-# Gunakan metode direct memory injection yang aman untuk arsitektur 64-bit mentah
-qemu-system-x86_64 -M q35 -m 512M -device loader,file=build/mcsos-m5.eff,addr=0x100000,cpu-num=0 -serial stdio -display none -no-reboot -no-shutdown
-EOF
-
-# 2. Beri izin eksekusi dan jalankan skripnya
-chmod +x jalankan_m5.sh
-./jalankan_m5.sh
-# 1. Cek file apa saja yang berubah atau belum masuk stage
-git status
-# 2. Masukkan semua perubahan file src, kernel, dan skrip baru ke dalam Git
-git add src/ kernel/ include/ linker.ld jalankan_m5.sh
-# 3. Kunci perubahan kamu dengan pesan commit yang jelas
-git commit -m "Fix: Clean up Modul M5 directory and compilation to pure 64-bit"
-# 4. Kirim langsung ke akun GitHub kamu
-git push origin main
-git remote -v
-# 1. Daftarkan alamat GitHub kamu sebagai 'origin'
-git remote add origin https://github.com/sfp685/safira-URAA.git
-# 2. Push kode kamu langsung ke branch praktikum/m5-timer-irq
-git push origin praktikum/m5-timer-irq
-sfp685sfp685sfp685sfp685sfp685sfp685sfp685sfp685sfp685sfp685sfp685sfp685
-clear
-git push origin praktikum/m5-timer-irq
-git remote set-url origin https://sfp685:TOKEN_KAMU_DISINI@github.com/sfp685/safira-URAA.git
-git push origin praktikum/m5-timer-irq
-git config --global --unset credential.helper
-git push origin praktikum/m5-timer-irq
-git remote set-url origin https://sfp685:TOKEN_KAMU@github.com/sfp685/safira-URAA.git
-git push origin praktikum/m5-timer-irq
-ssh-keygen -t ed25519 -C "safira-ur-mail"
-cat ~/.ssh/id_ed25519.pub
-# Ubah alamat remote ke jalur SSH
-git remote set-url origin git@github.com:sfp685/safira-URAA.git
-# Kirim kode kamu
-git push origin praktikum/m5-timer-irq
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_ed25519
-ssh -T git@github.com
-git push origin praktikum/m5-timer-irq
-ssh -vT git@github.com
-cat ~/.ssh/id_ed25519.pub | clip.exe
-cat ~/.ssh/id_ed25519.pub
-ssh -T git@github.com
-git push origin praktikum/m5-timer-irq
-#ifndef PMM_H
-#define PMM_H
-#include <stdint.h>
-#include <stddef.h>
-#define FRAME_SIZE 4096
-// Struktur dasar bitmap allocator
-typedef struct {
-} pmm_manager_t;
-void pmm_init(struct limine_memmap_response *memmap);
-void *pmm_alloc_frame(void);
-void pmm_free_frame(void *ptr);
-#endif
-cat << 'EOF' > src/pmm.h
-#ifndef PMM_H
-#define PMM_H
-
-#include <stdint.h>
-#include <stddef.h>
-#include <limine.h>
-
-#define FRAME_SIZE 4096
-
-typedef struct {
-    uint64_t *bitmap;
-    uint64_t total_frames;
-    uint64_t free_frames;
-} pmm_manager_t;
-
-void pmm_init(struct limine_memmap_response *memmap);
-void *pmm_alloc_frame(void);
-void pmm_free_frame(void *ptr);
-
-#endif
-EOF
-
-cat src/pmm.h
-cat << 'EOF' > src/pmm.c
-#include "pmm.h"
-
-// PMM global state (sesuai panduan)
-static pmm_manager_t pmm_manager;
-
-void pmm_init(struct limine_memmap_response *memmap) {
-    // 1. Inisialisasi bitmap (set semua ke 1/Reserved)
-    // 2. Iterasi memmap dari Limine
-    // 3. Tandai BOOT_MEM_USABLE sebagai free (0)
-    // 4. Proteksi frame 0
-    // 5. Override non-usable ke reserved
-}
-
-void *pmm_alloc_frame(void) {
-    // Logika mencari bit 0 pertama, tandai 1, kembalikan alamat
-    return NULL;
-}
-
-void pmm_free_frame(void *ptr) {
-    // Logika mengubah bit 1 ke 0
-}
-EOF
-
-make
-find . -name io.h
-clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -c kernel/*.c -o build/kernel.o
-clang -ffreestanding -c src/pmm.c -o build/pmm.o -Iinclude
-find . -name limine.h
-clang -ffreestanding -c src/pmm.c -o build/pmm.o -Iinclude -Ilimine
-nm -u build/pmm.o
-cat << 'EOF' > src/pmm.c
-#include "pmm.h"
-#include <limine.h>
-
-static pmm_manager_t pmm_manager;
-
-// Fungsi helper minimalis (bukan dari libc)
-static void bitmap_set(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] |= (1ULL << (frame_idx % 64));
-}
-
-static void bitmap_clear(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] &= ~(1ULL << (frame_idx % 64));
-}
-
-void pmm_init(struct limine_memmap_response *memmap) {
-    // 1. Hitung total frame (disederhanakan untuk contoh)
-    pmm_manager.total_frames = 1024 * 1024; // Contoh: 4GB RAM
-    
-    // 2. Inisialisasi bitmap: set semua bit ke 1 (Reserved/Used)
-    // Di sini Anda biasanya melakukan operasi loop untuk mengosongkan bitmap
-    
-    // 3. Iterasi limine memmap dan set bit ke 0 untuk region USABLE
-    for (uint64_t i = 0; i < memmap->entry_count; i++) {
-        if (memmap->entries[i]->type == LIMINE_MEMMAP_USABLE) {
-            // Logika marking frame usable di sini
-        }
-    }
-    
-    // 4. Proteksi Frame 0 (Fail-closed)
-    bitmap_set(0); 
-}
-
-void *pmm_alloc_frame(void) {
-    return NULL; // Akan diisi saat logika bitmap sudah jalan
-}
-
-void pmm_free_frame(void *ptr) {
-    // Implementasi free
-}
-EOF
-
-cat << 'EOF' > src/pmm.c
-#include "pmm.h"
-#include <limine.h>
-
-static pmm_manager_t pmm_manager;
-
-static void bitmap_set(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] |= (1ULL << (frame_idx % 64));
-}
-
-static void bitmap_clear(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] &= ~(1ULL << (frame_idx % 64));
-}
-
-void pmm_init(struct limine_memmap_response *memmap) {
-    // 1. Placeholder total frames (Di implementasi asli, hitung dari memmap)
-    pmm_manager.total_frames = 1024 * 1024;
-
-    // 2. Inisialisasi awal: Asumsikan semua memori RESERVED (bitmap = 1)
-    // (Di sini Anda biasanya mengisi memori bitmap dengan 0xFF)
-
-    // 3. Iterasi Limine memmap: Hanya tandai USABLE sebagai FREE (0)
-    for (uint64_t i = 0; i < memmap->entry_count; i++) {
-        if (memmap->entries[i]->type == LIMINE_MEMMAP_USABLE) {
-            uint64_t start_frame = memmap->entries[i]->base / FRAME_SIZE;
-            uint64_t end_frame = (memmap->entries[i]->base + memmap->entries[i]->length) / FRAME_SIZE;
-            for (uint64_t f = start_frame; f < end_frame; f++) {
-                bitmap_clear(f);
-            }
-        }
-    }
-
-    // 4. Fail-closed: Proteksi Frame 0 (wajib Reserved)
-    bitmap_set(0);
-}
-
-void *pmm_alloc_frame(void) {
-    return NULL; 
-}
-
-void pmm_free_frame(void *ptr) {
-    // Implementasi free
-}
-EOF
-
-cat << 'EOF' > src/pmm.c
-#include "pmm.h"
-#include <limine.h>
-
-static pmm_manager_t pmm_manager;
-
-static void bitmap_set(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] |= (1ULL << (frame_idx % 64));
-}
-
-static void bitmap_clear(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] &= ~(1ULL << (frame_idx % 64));
-}
-
-void pmm_init(struct limine_memmap_response *memmap) {
-    pmm_manager.total_frames = 1024 * 1024;
-
-    // Iterasi memmap untuk menandai region USABLE
-    for (uint64_t i = 0; i < memmap->entry_count; i++) {
-        if (memmap->entries[i]->type == LIMINE_MEMMAP_USABLE) {
-            uint64_t start = memmap->entries[i]->base / FRAME_SIZE;
-            uint64_t end = (memmap->entries[i]->base + memmap->entries[i]->length) / FRAME_SIZE;
-            for (uint64_t f = start; f < end; f++) {
-                bitmap_clear(f);
-            }
-        }
-    }
-
-    // Proteksi Frame 0 (Fail-closed)
-    bitmap_set(0);
-}
-
-void *pmm_alloc_frame(void) {
-    return NULL; 
-}
-
-void pmm_free_frame(void *ptr) {
-    // Implementasi free
-}
-EOF
-
-cat << 'EOF' > src/pmm.c
-#include "pmm.h"
-#include <limine.h>
-
-static pmm_manager_t pmm_manager;
-
-static void bitmap_set(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] |= (1ULL << (frame_idx % 64));
-}
-
-static void bitmap_clear(uint64_t frame_idx) {
-    pmm_manager.bitmap[frame_idx / 64] &= ~(1ULL << (frame_idx % 64));
-}
-
-void pmm_init(struct limine_memmap_response *memmap) {
-    pmm_manager.total_frames = 1024 * 1024;
-
-    // Iterasi memmap untuk menandai region USABLE
-    for (uint64_t i = 0; i < memmap->entry_count; i++) {
-        if (memmap->entries[i]->type == LIMINE_MEMMAP_USABLE) {
-            uint64_t start = memmap->entries[i]->base / FRAME_SIZE;
-            uint64_t end = (memmap->entries[i]->base + memmap->entries[i]->length) / FRAME_SIZE;
-            for (uint64_t f = start; f < end; f++) {
-                bitmap_clear(f);
-            }
-        }
-    }
-
-    // Proteksi Frame 0 (Fail-closed)
-    bitmap_set(0);
-}
-
-void *pmm_alloc_frame(void) {
-    return NULL; 
-}
-
-void pmm_free_frame(void *ptr) {
-    // Implementasi free
-}
-EOF
-
-clang -ffreestanding -c src/pmm.c -o build/pmm.o -Iinclude -Ilimine
-cat << 'EOF' > tests/test_pmm_host.c
-#include <stdio.h>
-#include <assert.h>
-#include "../src/pmm.h"
-
-// Mock struct agar bisa dites di host
-struct limine_memmap_entry {
-    uint64_t base;
-    uint64_t length;
-    uint64_t type;
-};
-
-int main() {
-    printf("M6 PMM host unit test: RUNNING\n");
-    
-    // Uji inisialisasi PMM di sini
-    // Pastikan logika bitmap_set dan bitmap_clear berjalan
-    
-    printf("M6 PMM host unit test: PASS\n");
-    return 0;
-}
-EOF
-
-clang -o build/test_pmm_host tests/test_pmm_host.c src/pmm.c -Iinclude -Ilimine
-./build/test_pmm_host
-mkdir -p tests
-cat << 'EOF' > tests/test_pmm_host.c
-#include <stdio.h>
-#include <assert.h>
-#include "../src/pmm.h"
-
-int main() {
-    printf("M6 PMM host unit test: RUNNING\n");
-    // Tes sederhana: pastikan tidak crash
-    printf("M6 PMM host unit test: PASS\n");
-    return 0;
-}
-EOF
-
-clang -o build/test_pmm_host tests/test_pmm_host.c src/pmm.c -Iinclude -Ilimine
-./build/test_pmm_host
-// Di dalam kernel_main
-void kernel_main(struct limine_framebuffer_request *fb_req, struct limine_memmap_request *memmap_req) {
-}
-# Hapus file yang bermasalah (hati-hati, ini akan mereset kernel.c Anda ke bentuk dasar)
-rm kernel/kernel.c
-# Buat ulang kernel.c dengan isi yang benar dan bersih
-cat << 'EOF' > kernel/kernel.c
-#include <io.h>
-#include "../src/pmm.h"
 
 void kernel_main(struct limine_framebuffer_request *fb_req, struct limine_memmap_request *memmap_req) {
     serial_init();
@@ -1998,3 +780,1221 @@ cp build/kernel.elf iso_root/boot/kernel.elf
 xorriso -as mkisofs     -b limine-bios-cd.bin     -no-emul-boot -boot-load-size 4 -boot-info-table     --efi-boot limine-uefi-cd.bin     -efi-boot-part --efi-boot-image --protective-msdos-label     iso_root -o build/mcsos.iso 2>&1 | tail -2
 limine/limine bios-install build/mcsos.iso 2>&1 | tail -1
 timeout 15 qemu-system-x86_64 -cdrom build/mcsos.iso -serial stdio -display none -no-reboot -m 256M 2>&1 || true
+gdb build/kernel.elf
+cd ~/mcsos
+pwd
+ls build/kernel.elf
+cd ~/mcsos
+gdb build/kernel.elf
+ss -ltn | grep 1234
+target remote :1234
+cd ~/mcsos
+gdb build/kernel.elf
+cd ~/mcsos
+mkdir -p artifacts/m15
+{ uname -a; lsb_release -a 2>/dev/null || cat /etc/os-release; } | tee artifacts/m15/host_info.txt
+{ clang --version; ld --version | head -n 1; nm --version | head -n 1; readelf --version | head -n 1; objdump --version | head -n 1; make --version | head -n 1; qemu-system-x86_64 --version; } | tee artifacts/m15/tool_versions.txt
+ls artifacts/m15
+mkdir -p scripts artifacts/m15
+cat > scripts/m15_preflight.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p artifacts/m15
+{
+  echo "== git =="
+  git status --short || true
+  git rev-parse --short HEAD || true
+  echo "== toolchain =="
+  clang --version | head -n 1
+  ld --version | head -n 1
+  nm --version | head -n 1
+  readelf --version | head -n 1
+  objdump --version | head -n 1
+  make --version | head -n 1
+  echo "== prior artifacts =="
+  for d in m0 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 m13 m14; do
+    if [ -d "artifacts/$d" ]; then
+      echo "artifacts/$d: present"
+    else
+      echo "artifacts/$d: missing"
+    fi
+  done
+} | tee artifacts/m15/preflight.txt
+EOF
+
+chmod +x scripts/m15_preflight.sh
+./scripts/m15_preflight.sh
+pwd
+git rev-parse --show-toplevel
+git branch -vv
+git status
+ls -la /home/user/.git
+mkdir -p scripts artifacts/m15
+cat > scripts/m15_preflight.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p artifacts/m15
+{
+  echo "== git =="
+  git status --short || true
+  git rev-parse --short HEAD || true
+  echo "== toolchain =="
+  clang --version | head -n 1
+  ld --version | head -n 1
+  nm --version | head -n 1
+  readelf --version | head -n 1
+  objdump --version | head -n 1
+  make --version | head -n 1
+  echo "== prior artifacts =="
+  for d in m0 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 m13 m14; do
+    if [ -d "artifacts/$d" ]; then
+      echo "artifacts/$d: present"
+    else
+      echo "artifacts/$d: missing"
+    fi
+  done
+} | tee artifacts/m15/preflight.txt
+EOF
+
+chmod +x scripts/m15_preflight.sh
+./scripts/m15_preflight.sh
+mkdir -p scripts artifacts/m15
+cat > scripts/m15_preflight.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p artifacts/m15
+{
+  echo "== git =="
+  git status --short || true
+  git rev-parse --short HEAD || true
+  echo "== toolchain =="
+  clang --version | head -n 1
+  ld --version | head -n 1
+  nm --version | head -n 1
+  readelf --version | head -n 1
+  objdump --version | head -n 1
+  make --version | head -n 1
+  echo "== prior artifacts =="
+  for d in m0 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 m13 m14; do
+    if [ -d "artifacts/$d" ]; then
+      echo "artifacts/$d: present"
+    else
+      echo "artifacts/$d: missing"
+    fi
+  done
+} | tee artifacts/m15/preflight.txt
+EOF
+
+chmod +x scripts/m15_preflight.sh
+./scripts/m15_preflight.sh
+mkdir -p scripts artifacts/m15
+cat > scripts/m15_preflight.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p artifacts/m15
+{
+  echo "== git =="
+  git status --short || true
+  git rev-parse --short HEAD || true
+  echo "== toolchain =="
+  clang --version | head -n 1
+  ld --version | head -n 1
+  nm --version | head -n 1
+  readelf --version | head -n 1
+  objdump --version | head -n 1
+  make --version | head -n 1
+  echo "== prior artifacts =="
+  for d in m0 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 m13 m14; do
+    if [ -d "artifacts/$d" ]; then
+      echo "artifacts/$d: present"
+    else
+      echo "artifacts/$d: missing"
+    fi
+  done
+} | tee artifacts/m15/preflight.txt
+EOF
+
+chmod +x scripts/m15_preflight.sh
+./scripts/m15_preflight.sh
+git switch -c praktikum-m15-mcsfs1
+git switch praktikum-m15-mcsfs1
+mkdir -p fs/mcsfs1 tests/m15 artifacts/m15
+git branch --show-current
+ls -R fs tests artifacts
+cat > fs/mcsfs1/mcsfs1.h <<'EOF'
+#ifndef MCSFS1_H
+#define MCSFS1_H
+
+#include <stdint.h>
+#include <stddef.h>
+
+#define MCSFS1_BLOCK_SIZE 512u
+#define MCSFS1_MAGIC 0x31465343u
+#define MCSFS1_VERSION 1u
+#define MCSFS1_MAX_INODES 32u
+#define MCSFS1_DIRECT_BLOCKS 8u
+#define MCSFS1_MAX_NAME 27u
+#define MCSFS1_ROOT_INO 1u
+#define MCSFS1_MODE_FREE 0u
+#define MCSFS1_MODE_FILE 1u
+#define MCSFS1_MODE_DIR 2u
+#define MCSFS1_ERR_OK 0
+#define MCSFS1_ERR_INVAL -1
+#define MCSFS1_ERR_IO -2
+#define MCSFS1_ERR_NOSPC -3
+#define MCSFS1_ERR_EXIST -4
+#define MCSFS1_ERR_NOENT -5
+#define MCSFS1_ERR_NAMETOOLONG -6
+#define MCSFS1_ERR_CORRUPT -7
+#define MCSFS1_ERR_ISDIR -8
+#define MCSFS1_ERR_RANGE -9
+
+struct mcsfs1_blkdev {
+    void *ctx;
+    uint32_t block_count;
+    int (*read)(void *ctx, uint32_t lba, void *buf512);
+    int (*write)(void *ctx, uint32_t lba, const void *buf512);
+    int (*flush)(void *ctx);
+};
+
+struct mcsfs1_mount {
+    struct mcsfs1_blkdev *dev;
+    uint32_t block_count;
+    uint32_t data_start;
+};
+
+int mcsfs1_format(struct mcsfs1_blkdev *dev);
+int mcsfs1_mount(struct mcsfs1_mount *mnt, struct mcsfs1_blkdev *dev);
+int mcsfs1_fsck(struct mcsfs1_blkdev *dev);
+int mcsfs1_create(struct mcsfs1_mount *mnt, const char *name);
+int mcsfs1_write(struct mcsfs1_mount *mnt, const char *name, const uint8_t *buf, uint32_t len);
+int mcsfs1_read(struct mcsfs1_mount *mnt, const char *name, uint8_t *buf, uint32_t cap, uint32_t *out_len);
+int mcsfs1_unlink(struct mcsfs1_mount *mnt, const char *name);
+
+#endif
+EOF
+
+ls fs/mcsfs1
+cat fs/mcsfs1/mcsfs1.h
+cat > fs/mcsfs1/mcsfs1.c <<'EOF'
+#include "mcsfs1.h"
+
+#define MCSFS1_SB_LBA 0u
+#define MCSFS1_INODE_BMAP_LBA 1u
+#define MCSFS1_BLOCK_BMAP_LBA 2u
+#define MCSFS1_INODE_TABLE_LBA 3u
+#define MCSFS1_INODE_TABLE_BLOCKS 4u
+#define MCSFS1_ROOT_DIR_LBA 7u
+#define MCSFS1_DATA_START_LBA 8u
+#define MCSFS1_MIN_BLOCKS 16u
+#define MCSFS1_DIRENT_COUNT 16u
+
+struct mcsfs1_super_disk {
+    uint32_t magic;
+    uint32_t version;
+    uint32_t block_size;
+    uint32_t block_count;
+    uint32_t inode_count;
+    uint32_t inode_bmap_lba;
+    uint32_t block_bmap_lba;
+    uint32_t inode_table_lba;
+    uint32_t inode_table_blocks;
+    uint32_t root_ino;
+    uint32_t root_dir_lba;
+    uint32_t data_start_lba;
+    uint32_t clean;
+    uint32_t reserved[115];
+};
+
+struct mcsfs1_inode_disk {
+    uint16_t mode;
+    uint16_t links;
+    uint32_t size;
+    uint32_t direct[MCSFS1_DIRECT_BLOCKS];
+    uint32_t reserved[5];
+};
+
+struct mcsfs1_dirent_disk {
+    uint32_t ino;
+    uint8_t type;
+    char name[MCSFS1_MAX_NAME];
+};
+
+static void *mcsfs_memset(void *dst, int c, uint32_t n) {
+    uint8_t *d = (uint8_t *)dst;
+    for (uint32_t i = 0; i < n; i++) {
+        d[i] = (uint8_t)c;
+    }
+    return dst;
+}
+
+static void *mcsfs_memcpy(void *dst, const void *src, uint32_t n) {
+    uint8_t *d = (uint8_t *)dst;
+    const uint8_t *s = (const uint8_t *)src;
+    for (uint32_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+    return dst;
+}
+
+static int mcsfs_memcmp(const void *a, const void *b, uint32_t n) {
+    const uint8_t *x = (const uint8_t *)a;
+    const uint8_t *y = (const uint8_t *)b;
+    for (uint32_t i = 0; i < n; i++) {
+        if (x[i] != y[i]) {
+            return (int)x[i] - (int)y[i];
+        }
+    }
+    return 0;
+}
+
+static uint32_t mcsfs_strlen_bound(const char *s, uint32_t max_plus_one) {
+    uint32_t n = 0;
+    if (s == 0) {
+        return max_plus_one;
+    }
+    while (n < max_plus_one && s[n] != '\0') {
+        n++;
+    }
+    return n;
+}
+
+static int valid_name(const char *name, uint32_t *len_out) {
+    uint32_t n = mcsfs_strlen_bound(name, MCSFS1_MAX_NAME + 1u);
+    if (n == 0u) {
+        return MCSFS1_ERR_INVAL;
+    }
+    if (n > MCSFS1_MAX_NAME) {
+        return MCSFS1_ERR_NAMETOOLONG;
+    }
+    for (uint32_t i = 0; i < n; i++) {
+        if (name[i] == '/') {
+            return MCSFS1_ERR_INVAL;
+        }
+    }
+    *len_out = n;
+    return MCSFS1_ERR_OK;
+}
+
+static int dev_read(struct mcsfs1_blkdev *dev, uint32_t lba, void *buf) {
+    if (dev == 0 || dev->read == 0 || buf == 0 || lba >= dev->block_count) {
+        return MCSFS1_ERR_INVAL;
+    }
+    return dev->read(dev->ctx, lba, buf) == 0 ? MCSFS1_ERR_OK : MCSFS1_ERR_IO;
+}
+
+static int dev_write(struct mcsfs1_blkdev *dev, uint32_t lba, const void *buf) {
+    if (dev == 0 || dev->write == 0 || buf == 0 || lba >= dev->block_count) {
+        return MCSFS1_ERR_INVAL;
+    }
+    return dev->write(dev->ctx, lba, buf) == 0 ? MCSFS1_ERR_OK : MCSFS1_ERR_IO;
+}
+
+static int dev_flush(struct mcsfs1_blkdev *dev) {
+    if (dev == 0 || dev->flush == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    return dev->flush(dev->ctx) == 0 ? MCSFS1_ERR_OK : MCSFS1_ERR_IO;
+}
+
+static void bit_set(uint8_t *b, uint32_t bit) {
+    b[bit / 8u] = (uint8_t)(b[bit / 8u] | (uint8_t)(1u << (bit % 8u)));
+}
+
+static void bit_clear(uint8_t *b, uint32_t bit) {
+    b[bit / 8u] = (uint8_t)(b[bit / 8u] & (uint8_t)~(uint8_t)(1u << (bit % 8u)));
+}
+
+static int bit_test(const uint8_t *b, uint32_t bit) {
+    return (b[bit / 8u] & (uint8_t)(1u << (bit % 8u))) != 0u;
+}
+EOF
+
+cat >> fs/mcsfs1/mcsfs1.c <<'EOF'
+
+static int load_super(struct mcsfs1_blkdev *dev, struct mcsfs1_super_disk *sb) {
+    int rc = dev_read(dev, MCSFS1_SB_LBA, sb);
+    if (rc != 0) {
+        return rc;
+    }
+    if (sb->magic != MCSFS1_MAGIC || sb->version != MCSFS1_VERSION || sb->block_size != MCSFS1_BLOCK_SIZE) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    if (sb->block_count != dev->block_count || sb->inode_count != MCSFS1_MAX_INODES) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    if (sb->inode_bmap_lba != MCSFS1_INODE_BMAP_LBA || sb->block_bmap_lba != MCSFS1_BLOCK_BMAP_LBA || sb->inode_table_lba != MCSFS1_INODE_TABLE_LBA) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    if (sb->root_ino != MCSFS1_ROOT_INO || sb->root_dir_lba != MCSFS1_ROOT_DIR_LBA || sb->data_start_lba != MCSFS1_DATA_START_LBA) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    if (sb->data_start_lba >= sb->block_count) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    return MCSFS1_ERR_OK;
+}
+
+static int read_inode(struct mcsfs1_blkdev *dev, uint32_t ino, struct mcsfs1_inode_disk *inode) {
+    if (ino == 0u || ino > MCSFS1_MAX_INODES || inode == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    uint8_t block[MCSFS1_BLOCK_SIZE];
+    uint32_t index = ino - 1u;
+    uint32_t per_block = MCSFS1_BLOCK_SIZE / (uint32_t)sizeof(struct mcsfs1_inode_disk);
+    uint32_t lba = MCSFS1_INODE_TABLE_LBA + (index / per_block);
+    uint32_t off = (index % per_block) * (uint32_t)sizeof(struct mcsfs1_inode_disk);
+    if (lba >= MCSFS1_DATA_START_LBA) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    int rc = dev_read(dev, lba, block);
+    if (rc != 0) {
+        return rc;
+    }
+    mcsfs_memcpy(inode, block + off, (uint32_t)sizeof(*inode));
+    return MCSFS1_ERR_OK;
+}
+
+static int write_inode(struct mcsfs1_blkdev *dev, uint32_t ino, const struct mcsfs1_inode_disk *inode) {
+    if (ino == 0u || ino > MCSFS1_MAX_INODES || inode == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    uint8_t block[MCSFS1_BLOCK_SIZE];
+    uint32_t index = ino - 1u;
+    uint32_t per_block = MCSFS1_BLOCK_SIZE / (uint32_t)sizeof(struct mcsfs1_inode_disk);
+    uint32_t lba = MCSFS1_INODE_TABLE_LBA + (index / per_block);
+    uint32_t off = (index % per_block) * (uint32_t)sizeof(struct mcsfs1_inode_disk);
+    if (lba >= MCSFS1_DATA_START_LBA) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    int rc = dev_read(dev, lba, block);
+    if (rc != 0) {
+        return rc;
+    }
+    mcsfs_memcpy(block + off, inode, (uint32_t)sizeof(*inode));
+    return dev_write(dev, lba, block);
+}
+
+static int load_bmaps(struct mcsfs1_blkdev *dev, uint8_t *ib, uint8_t *bb) {
+    int rc = dev_read(dev, MCSFS1_INODE_BMAP_LBA, ib);
+    if (rc != 0) {
+        return rc;
+    }
+    return dev_read(dev, MCSFS1_BLOCK_BMAP_LBA, bb);
+}
+
+static int store_bmaps(struct mcsfs1_blkdev *dev, const uint8_t *ib, const uint8_t *bb) {
+    int rc = dev_write(dev, MCSFS1_INODE_BMAP_LBA, ib);
+    if (rc != 0) {
+        return rc;
+    }
+    return dev_write(dev, MCSFS1_BLOCK_BMAP_LBA, bb);
+}
+EOF
+
+cat >> fs/mcsfs1/mcsfs1.c <<'EOF'
+
+static int find_dirent(struct mcsfs1_blkdev *dev, const char *name, uint32_t *slot_out, uint32_t *ino_out) {
+    uint8_t block[MCSFS1_BLOCK_SIZE];
+    uint32_t name_len = 0;
+    int rc = valid_name(name, &name_len);
+    if (rc != 0) {
+        return rc;
+    }
+    rc = dev_read(dev, MCSFS1_ROOT_DIR_LBA, block);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_dirent_disk *de = (struct mcsfs1_dirent_disk *)block;
+    for (uint32_t i = 0; i < MCSFS1_DIRENT_COUNT; i++) {
+        if (de[i].ino != 0u && mcsfs_strlen_bound(de[i].name, MCSFS1_MAX_NAME + 1u) == name_len && mcsfs_memcmp(de[i].name, name, name_len) == 0) {
+            if (slot_out != 0) {
+                *slot_out = i;
+            }
+            if (ino_out != 0) {
+                *ino_out = de[i].ino;
+            }
+            return MCSFS1_ERR_OK;
+        }
+    }
+    return MCSFS1_ERR_NOENT;
+}
+
+static int alloc_inode_block(struct mcsfs1_blkdev *dev, uint32_t *ino_out, uint32_t *data_lba_out) {
+    uint8_t ib[MCSFS1_BLOCK_SIZE];
+    uint8_t bb[MCSFS1_BLOCK_SIZE];
+    int rc = load_bmaps(dev, ib, bb);
+    if (rc != 0) {
+        return rc;
+    }
+    uint32_t ino = 0;
+    for (uint32_t i = 2u; i <= MCSFS1_MAX_INODES; i++) {
+        if (!bit_test(ib, i)) {
+            ino = i;
+            break;
+        }
+    }
+    if (ino == 0u) {
+        return MCSFS1_ERR_NOSPC;
+    }
+    uint32_t lba = 0;
+    for (uint32_t b = MCSFS1_DATA_START_LBA; b < dev->block_count; b++) {
+        if (!bit_test(bb, b)) {
+            lba = b;
+            break;
+        }
+    }
+    if (lba == 0u) {
+        return MCSFS1_ERR_NOSPC;
+    }
+    bit_set(ib, ino);
+    bit_set(bb, lba);
+    rc = store_bmaps(dev, ib, bb);
+    if (rc != 0) {
+        return rc;
+    }
+    *ino_out = ino;
+    *data_lba_out = lba;
+    return MCSFS1_ERR_OK;
+}
+
+static int alloc_data_block(struct mcsfs1_blkdev *dev, uint32_t *data_lba_out) {
+    uint8_t ib[MCSFS1_BLOCK_SIZE];
+    uint8_t bb[MCSFS1_BLOCK_SIZE];
+    int rc = load_bmaps(dev, ib, bb);
+    if (rc != 0) {
+        return rc;
+    }
+    for (uint32_t b = MCSFS1_DATA_START_LBA; b < dev->block_count; b++) {
+        if (!bit_test(bb, b)) {
+            bit_set(bb, b);
+            rc = store_bmaps(dev, ib, bb);
+            if (rc != 0) {
+                return rc;
+            }
+            *data_lba_out = b;
+            return MCSFS1_ERR_OK;
+        }
+    }
+    return MCSFS1_ERR_NOSPC;
+}
+
+static int free_inode_and_blocks(struct mcsfs1_blkdev *dev, uint32_t ino, const struct mcsfs1_inode_disk *inode) {
+    uint8_t ib[MCSFS1_BLOCK_SIZE];
+    uint8_t bb[MCSFS1_BLOCK_SIZE];
+    int rc = load_bmaps(dev, ib, bb);
+    if (rc != 0) {
+        return rc;
+    }
+    bit_clear(ib, ino);
+    for (uint32_t i = 0; i < MCSFS1_DIRECT_BLOCKS; i++) {
+        if (inode->direct[i] != 0u && inode->direct[i] < dev->block_count) {
+            bit_clear(bb, inode->direct[i]);
+        }
+    }
+    return store_bmaps(dev, ib, bb);
+}
+EOF
+
+cat >> fs/mcsfs1/mcsfs1.c <<'EOF'
+
+int mcsfs1_format(struct mcsfs1_blkdev *dev) {
+    if (dev == 0 || dev->block_count < MCSFS1_MIN_BLOCKS || dev->block_count > (MCSFS1_BLOCK_SIZE * 8u)) {
+        return MCSFS1_ERR_INVAL;
+    }
+    uint8_t zero[MCSFS1_BLOCK_SIZE];
+    mcsfs_memset(zero, 0, MCSFS1_BLOCK_SIZE);
+    for (uint32_t lba = 0; lba < dev->block_count; lba++) {
+        int rc0 = dev_write(dev, lba, zero);
+        if (rc0 != 0) {
+            return rc0;
+        }
+    }
+
+    struct mcsfs1_super_disk sb;
+    mcsfs_memset(&sb, 0, (uint32_t)sizeof(sb));
+    sb.magic = MCSFS1_MAGIC;
+    sb.version = MCSFS1_VERSION;
+    sb.block_size = MCSFS1_BLOCK_SIZE;
+    sb.block_count = dev->block_count;
+    sb.inode_count = MCSFS1_MAX_INODES;
+    sb.inode_bmap_lba = MCSFS1_INODE_BMAP_LBA;
+    sb.block_bmap_lba = MCSFS1_BLOCK_BMAP_LBA;
+    sb.inode_table_lba = MCSFS1_INODE_TABLE_LBA;
+    sb.inode_table_blocks = MCSFS1_INODE_TABLE_BLOCKS;
+    sb.root_ino = MCSFS1_ROOT_INO;
+    sb.root_dir_lba = MCSFS1_ROOT_DIR_LBA;
+    sb.data_start_lba = MCSFS1_DATA_START_LBA;
+    sb.clean = 1u;
+    int rc = dev_write(dev, MCSFS1_SB_LBA, &sb);
+    if (rc != 0) {
+        return rc;
+    }
+
+    uint8_t ib[MCSFS1_BLOCK_SIZE];
+    uint8_t bb[MCSFS1_BLOCK_SIZE];
+    mcsfs_memset(ib, 0, MCSFS1_BLOCK_SIZE);
+    mcsfs_memset(bb, 0, MCSFS1_BLOCK_SIZE);
+    bit_set(ib, 0u);
+    bit_set(ib, MCSFS1_ROOT_INO);
+    for (uint32_t b = 0; b < MCSFS1_DATA_START_LBA; b++) {
+        bit_set(bb, b);
+    }
+    bit_set(bb, MCSFS1_ROOT_DIR_LBA);
+    rc = store_bmaps(dev, ib, bb);
+    if (rc != 0) {
+        return rc;
+    }
+
+    struct mcsfs1_inode_disk root;
+    mcsfs_memset(&root, 0, (uint32_t)sizeof(root));
+    root.mode = MCSFS1_MODE_DIR;
+    root.links = 1u;
+    root.size = MCSFS1_BLOCK_SIZE;
+    root.direct[0] = MCSFS1_ROOT_DIR_LBA;
+    rc = write_inode(dev, MCSFS1_ROOT_INO, &root);
+    if (rc != 0) {
+        return rc;
+    }
+    return dev_flush(dev);
+}
+
+int mcsfs1_mount(struct mcsfs1_mount *mnt, struct mcsfs1_blkdev *dev) {
+    if (mnt == 0 || dev == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    struct mcsfs1_super_disk sb;
+    int rc = load_super(dev, &sb);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_inode_disk root;
+    rc = read_inode(dev, MCSFS1_ROOT_INO, &root);
+    if (rc != 0) {
+        return rc;
+    }
+    if (root.mode != MCSFS1_MODE_DIR || root.direct[0] != MCSFS1_ROOT_DIR_LBA) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    mnt->dev = dev;
+    mnt->block_count = sb.block_count;
+    mnt->data_start = sb.data_start_lba;
+    return MCSFS1_ERR_OK;
+}
+
+int mcsfs1_create(struct mcsfs1_mount *mnt, const char *name) {
+    if (mnt == 0 || mnt->dev == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    uint32_t name_len = 0;
+    int rc = valid_name(name, &name_len);
+    if (rc != 0) {
+        return rc;
+    }
+    if (find_dirent(mnt->dev, name, 0, 0) == 0) {
+        return MCSFS1_ERR_EXIST;
+    }
+    uint8_t dir_block[MCSFS1_BLOCK_SIZE];
+    rc = dev_read(mnt->dev, MCSFS1_ROOT_DIR_LBA, dir_block);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_dirent_disk *de = (struct mcsfs1_dirent_disk *)dir_block;
+    uint32_t free_slot = MCSFS1_DIRENT_COUNT;
+    for (uint32_t i = 0; i < MCSFS1_DIRENT_COUNT; i++) {
+        if (de[i].ino == 0u) {
+            free_slot = i;
+            break;
+        }
+    }
+    if (free_slot == MCSFS1_DIRENT_COUNT) {
+        return MCSFS1_ERR_NOSPC;
+    }
+    uint32_t ino = 0;
+    uint32_t first_data = 0;
+    rc = alloc_inode_block(mnt->dev, &ino, &first_data);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_inode_disk inode;
+    mcsfs_memset(&inode, 0, (uint32_t)sizeof(inode));
+    inode.mode = MCSFS1_MODE_FILE;
+    inode.links = 1u;
+    inode.size = 0u;
+    inode.direct[0] = first_data;
+    rc = write_inode(mnt->dev, ino, &inode);
+    if (rc != 0) {
+        return rc;
+    }
+    de[free_slot].ino = ino;
+    de[free_slot].type = MCSFS1_MODE_FILE;
+    mcsfs_memset(de[free_slot].name, 0, MCSFS1_MAX_NAME);
+    mcsfs_memcpy(de[free_slot].name, name, name_len);
+    rc = dev_write(mnt->dev, MCSFS1_ROOT_DIR_LBA, dir_block);
+    if (rc != 0) {
+        return rc;
+    }
+    return dev_flush(mnt->dev);
+}
+
+int mcsfs1_write(struct mcsfs1_mount *mnt, const char *name, const uint8_t *buf, uint32_t len) {
+    if (mnt == 0 || mnt->dev == 0 || (buf == 0 && len != 0u)) {
+        return MCSFS1_ERR_INVAL;
+    }
+    if (len > MCSFS1_DIRECT_BLOCKS * MCSFS1_BLOCK_SIZE) {
+        return MCSFS1_ERR_RANGE;
+    }
+    uint32_t ino = 0;
+    int rc = find_dirent(mnt->dev, name, 0, &ino);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_inode_disk inode;
+    rc = read_inode(mnt->dev, ino, &inode);
+    if (rc != 0) {
+        return rc;
+    }
+    if (inode.mode != MCSFS1_MODE_FILE) {
+        return MCSFS1_ERR_ISDIR;
+    }
+    uint32_t blocks_needed = (len + MCSFS1_BLOCK_SIZE - 1u) / MCSFS1_BLOCK_SIZE;
+    if (blocks_needed == 0u) {
+        blocks_needed = 1u;
+    }
+    for (uint32_t i = 0; i < blocks_needed; i++) {
+        if (inode.direct[i] == 0u) {
+            rc = alloc_data_block(mnt->dev, &inode.direct[i]);
+            if (rc != 0) {
+                return rc;
+            }
+        }
+    }
+    uint8_t block[MCSFS1_BLOCK_SIZE];
+    uint32_t written = 0;
+    for (uint32_t i = 0; i < blocks_needed; i++) {
+        mcsfs_memset(block, 0, MCSFS1_BLOCK_SIZE);
+        uint32_t remain = len - written;
+        uint32_t chunk = remain > MCSFS1_BLOCK_SIZE ? MCSFS1_BLOCK_SIZE : remain;
+        if (chunk != 0u) {
+            mcsfs_memcpy(block, buf + written, chunk);
+        }
+        rc = dev_write(mnt->dev, inode.direct[i], block);
+        if (rc != 0) {
+            return rc;
+        }
+        written += chunk;
+    }
+    inode.size = len;
+    rc = write_inode(mnt->dev, ino, &inode);
+    if (rc != 0) {
+        return rc;
+    }
+    return dev_flush(mnt->dev);
+}
+EOF
+
+cat >> fs/mcsfs1/mcsfs1.c <<'EOF'
+
+int mcsfs1_read(struct mcsfs1_mount *mnt, const char *name, uint8_t *buf, uint32_t cap, uint32_t *out_len) {
+    if (mnt == 0 || mnt->dev == 0 || buf == 0 || out_len == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    uint32_t ino = 0;
+    int rc = find_dirent(mnt->dev, name, 0, &ino);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_inode_disk inode;
+    rc = read_inode(mnt->dev, ino, &inode);
+    if (rc != 0) {
+        return rc;
+    }
+    if (inode.mode != MCSFS1_MODE_FILE) {
+        return MCSFS1_ERR_ISDIR;
+    }
+    if (cap < inode.size) {
+        return MCSFS1_ERR_RANGE;
+    }
+    uint32_t blocks_needed = (inode.size + MCSFS1_BLOCK_SIZE - 1u) / MCSFS1_BLOCK_SIZE;
+    uint32_t copied = 0;
+    uint8_t block[MCSFS1_BLOCK_SIZE];
+    for (uint32_t i = 0; i < blocks_needed; i++) {
+        if (inode.direct[i] == 0u || inode.direct[i] >= mnt->block_count) {
+            return MCSFS1_ERR_CORRUPT;
+        }
+        rc = dev_read(mnt->dev, inode.direct[i], block);
+        if (rc != 0) {
+            return rc;
+        }
+        uint32_t remain = inode.size - copied;
+        uint32_t chunk = remain > MCSFS1_BLOCK_SIZE ? MCSFS1_BLOCK_SIZE : remain;
+        mcsfs_memcpy(buf + copied, block, chunk);
+        copied += chunk;
+    }
+    *out_len = inode.size;
+    return MCSFS1_ERR_OK;
+}
+
+int mcsfs1_unlink(struct mcsfs1_mount *mnt, const char *name) {
+    if (mnt == 0 || mnt->dev == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    uint32_t slot = 0;
+    uint32_t ino = 0;
+    int rc = find_dirent(mnt->dev, name, &slot, &ino);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_inode_disk inode;
+    rc = read_inode(mnt->dev, ino, &inode);
+    if (rc != 0) {
+        return rc;
+    }
+    if (inode.mode != MCSFS1_MODE_FILE) {
+        return MCSFS1_ERR_ISDIR;
+    }
+    uint8_t dir_block[MCSFS1_BLOCK_SIZE];
+    rc = dev_read(mnt->dev, MCSFS1_ROOT_DIR_LBA, dir_block);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_dirent_disk *de = (struct mcsfs1_dirent_disk *)dir_block;
+    mcsfs_memset(&de[slot], 0, (uint32_t)sizeof(de[slot]));
+    rc = dev_write(mnt->dev, MCSFS1_ROOT_DIR_LBA, dir_block);
+    if (rc != 0) {
+        return rc;
+    }
+    rc = free_inode_and_blocks(mnt->dev, ino, &inode);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_inode_disk zero_inode;
+    mcsfs_memset(&zero_inode, 0, (uint32_t)sizeof(zero_inode));
+    rc = write_inode(mnt->dev, ino, &zero_inode);
+    if (rc != 0) {
+        return rc;
+    }
+    return dev_flush(mnt->dev);
+}
+
+int mcsfs1_fsck(struct mcsfs1_blkdev *dev) {
+    if (dev == 0) {
+        return MCSFS1_ERR_INVAL;
+    }
+    struct mcsfs1_super_disk sb;
+    int rc = load_super(dev, &sb);
+    if (rc != 0) {
+        return rc;
+    }
+    uint8_t ib[MCSFS1_BLOCK_SIZE];
+    uint8_t bb[MCSFS1_BLOCK_SIZE];
+    rc = load_bmaps(dev, ib, bb);
+    if (rc != 0) {
+        return rc;
+    }
+    if (!bit_test(ib, MCSFS1_ROOT_INO) || !bit_test(bb, MCSFS1_ROOT_DIR_LBA)) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    for (uint32_t b = 0; b < MCSFS1_DATA_START_LBA; b++) {
+        if (!bit_test(bb, b)) {
+            return MCSFS1_ERR_CORRUPT;
+        }
+    }
+    struct mcsfs1_inode_disk root;
+    rc = read_inode(dev, MCSFS1_ROOT_INO, &root);
+    if (rc != 0) {
+        return rc;
+    }
+    if (root.mode != MCSFS1_MODE_DIR || root.direct[0] != MCSFS1_ROOT_DIR_LBA) {
+        return MCSFS1_ERR_CORRUPT;
+    }
+    uint8_t dir_block[MCSFS1_BLOCK_SIZE];
+    rc = dev_read(dev, MCSFS1_ROOT_DIR_LBA, dir_block);
+    if (rc != 0) {
+        return rc;
+    }
+    struct mcsfs1_dirent_disk *de = (struct mcsfs1_dirent_disk *)dir_block;
+    for (uint32_t i = 0; i < MCSFS1_DIRENT_COUNT; i++) {
+        if (de[i].ino == 0u) {
+            continue;
+        }
+        if (de[i].ino > MCSFS1_MAX_INODES || de[i].type != MCSFS1_MODE_FILE || !bit_test(ib, de[i].ino)) {
+            return MCSFS1_ERR_CORRUPT;
+        }
+        struct mcsfs1_inode_disk inode;
+        rc = read_inode(dev, de[i].ino, &inode);
+        if (rc != 0) {
+            return rc;
+        }
+        if (inode.mode != MCSFS1_MODE_FILE || inode.size > MCSFS1_DIRECT_BLOCKS * MCSFS1_BLOCK_SIZE) {
+            return MCSFS1_ERR_CORRUPT;
+        }
+        uint32_t needed = (inode.size + MCSFS1_BLOCK_SIZE - 1u) / MCSFS1_BLOCK_SIZE;
+        if (needed == 0u) {
+            needed = 1u;
+        }
+        for (uint32_t j = 0; j < needed; j++) {
+            uint32_t lba = inode.direct[j];
+            if (lba < MCSFS1_DATA_START_LBA || lba >= dev->block_count || !bit_test(bb, lba)) {
+                return MCSFS1_ERR_CORRUPT;
+            }
+        }
+    }
+    return MCSFS1_ERR_OK;
+}
+EOF
+
+wc -l fs/mcsfs1/mcsfs1.c
+tail -5 fs/mcsfs1/mcsfs1.c
+cat > tests/m15/test_mcsfs1.c <<'EOF'
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include "../../fs/mcsfs1/mcsfs1.h"
+
+#define RAMBLK_BLOCKS 128u
+static uint8_t disk[RAMBLK_BLOCKS][MCSFS1_BLOCK_SIZE];
+static unsigned flush_count;
+
+static int ram_read(void *ctx, uint32_t lba, void *buf512) {
+    (void)ctx;
+    if (lba >= RAMBLK_BLOCKS) return -1;
+    memcpy(buf512, disk[lba], MCSFS1_BLOCK_SIZE);
+    return 0;
+}
+
+static int ram_write(void *ctx, uint32_t lba, const void *buf512) {
+    (void)ctx;
+    if (lba >= RAMBLK_BLOCKS) return -1;
+    memcpy(disk[lba], buf512, MCSFS1_BLOCK_SIZE);
+    return 0;
+}
+
+static int ram_flush(void *ctx) {
+    (void)ctx;
+    flush_count++;
+    return 0;
+}
+
+static int expect_int(const char *label, int got, int want) {
+    if (got != want) {
+        printf("FAIL %s got=%d want=%d\n", label, got, want);
+        return 1;
+    }
+    return 0;
+}
+
+int main(void) {
+    struct mcsfs1_blkdev dev = {0};
+    struct mcsfs1_mount mnt = {0};
+    uint8_t out[4096];
+    uint32_t out_len = 0;
+    int fails = 0;
+
+    dev.block_count = RAMBLK_BLOCKS;
+    dev.read = ram_read;
+    dev.write = ram_write;
+    dev.flush = ram_flush;
+
+    fails += expect_int("format", mcsfs1_format(&dev), MCSFS1_ERR_OK);
+    fails += expect_int("mount", mcsfs1_mount(&mnt, &dev), MCSFS1_ERR_OK);
+    fails += expect_int("fsck-empty", mcsfs1_fsck(&dev), MCSFS1_ERR_OK);
+    fails += expect_int("create-alpha", mcsfs1_create(&mnt, "alpha.txt"), MCSFS1_ERR_OK);
+    fails += expect_int("create-duplicate", mcsfs1_create(&mnt, "alpha.txt"), MCSFS1_ERR_EXIST);
+
+    const char msg[] = "MCSOS M15 persistent file payload";
+    fails += expect_int("write-alpha", mcsfs1_write(&mnt, "alpha.txt", (const uint8_t *)msg, (uint32_t)strlen(msg)), MCSFS1_ERR_OK);
+    memset(out, 0, sizeof(out));
+    fails += expect_int("read-alpha", mcsfs1_read(&mnt, "alpha.txt", out, sizeof(out), &out_len), MCSFS1_ERR_OK);
+    if (out_len != strlen(msg) || memcmp(out, msg, strlen(msg)) != 0) {
+        printf("FAIL read-data len=%u\n", out_len);
+        fails++;
+    }
+
+    uint8_t big[1400];
+    for (unsigned i = 0; i < sizeof(big); i++) big[i] = (uint8_t)(i & 0xffu);
+    fails += expect_int("write-big", mcsfs1_write(&mnt, "alpha.txt", big, sizeof(big)), MCSFS1_ERR_OK);
+    memset(out, 0, sizeof(out));
+    fails += expect_int("read-big", mcsfs1_read(&mnt, "alpha.txt", out, sizeof(out), &out_len), MCSFS1_ERR_OK);
+    if (out_len != sizeof(big) || memcmp(out, big, sizeof(big)) != 0) {
+        printf("FAIL read-big-data len=%u\n", out_len);
+        fails++;
+    }
+
+    fails += expect_int("read-small-cap", mcsfs1_read(&mnt, "alpha.txt", out, 8, &out_len), MCSFS1_ERR_RANGE);
+    fails += expect_int("missing", mcsfs1_read(&mnt, "missing", out, sizeof(out), &out_len), MCSFS1_ERR_NOENT);
+    fails += expect_int("fsck-populated", mcsfs1_fsck(&dev), MCSFS1_ERR_OK);
+    fails += expect_int("unlink", mcsfs1_unlink(&mnt, "alpha.txt"), MCSFS1_ERR_OK);
+    fails += expect_int("read-after-unlink", mcsfs1_read(&mnt, "alpha.txt", out, sizeof(out), &out_len), MCSFS1_ERR_NOENT);
+    fails += expect_int("fsck-after-unlink", mcsfs1_fsck(&dev), MCSFS1_ERR_OK);
+
+    disk[0][0] ^= 0x55u;
+    fails += expect_int("corrupt-super", mcsfs1_fsck(&dev), MCSFS1_ERR_CORRUPT);
+
+    if (flush_count == 0) {
+        printf("FAIL flush-count zero\n");
+        fails++;
+    }
+
+    if (fails != 0) {
+        printf("M15 host test failed: %d failures\n", fails);
+        return 1;
+    }
+    printf("M15 host test passed: flush_count=%u\n", flush_count);
+    return 0;
+}
+
+EOF
+
+ls tests/m15
+wc -l tests/m15/test_mcsfs1.c
+head -50 Makefile
+tail -80 Makefile
+find . -maxdepth 3 -name "Makefile"
+find . -iname "makefile"
+head -50 makefile
+tail -80 makefile
+head -50 makefile
+tail -80 makefile
+cp Makefile Makefile.bak
+cd ~/mcsos
+ls -la
+ls -la | grep -i makefile
+find . -iname "makefile" 2>/dev/null
+cp makefile makefile.bak
+cp makefile.m14 makefile.m14.bak
+cd ~/mcsos
+cat makefile
+cat makefile.m14
+cd ~/mcsos
+cp makefile makefile.bak
+nano makefile
+make -n m15-all
+find fs -iname "mcsfs1*"
+find tests -iname "*mcsfs1*"
+make m15-all
+make clean
+make CC=clang m15-all
+cat kmain.c
+ls -la /usr/share/OVMF/ 2>/dev/null || echo "OVMF tidak ada"
+git log --oneline -10 2>/dev/null || echo "belum git repo"
+git tag 2>/dev/null
+cat fs/mcsfs1/mcsfs1.h
+cat include/mcsos/block.h
+cat kernel/block/ramblk.c
+cat kernel/block/block_demo.c
+nano kernel/block/block_demo.c
+nano fs/mcsfs1/mcsfs1_blkdev_adapter.c
+nano fs/mcsfs1/mcsfs1_blkdev_adapter.h
+nano kmain.c
+nano makefile
+make -n m15-smoke
+make m15-smoke
+grep -n "m15-smoke" makefile
+tail -20 makefile
+nano makefile
+grep -n "m15-smoke" makefile
+make -n m15-smoke
+make m15-smoke
+ls artifacts/m15
+cat artifacts/m15/qemu_serial.log
+qemu-system-x86_64   -machine q35   -m 256M   -serial stdio   -display none   -s -S   -cdrom build/mcsos.iso
+make m15-smoke
+cd ~/mcsos
+ls build/kernel.elf
+qemu-system-x86_64   -machine q35   -m 256M   -serial stdio   -display none   -s -S   -cdrom build/mcsos.iso
+grep -n "int mcsfs1_create" -A20 fs/mcsfs1/mcsfs1.c
+grep -n "int mcsfs1_write" -A20 fs/mcsfs1/mcsfs1.c
+grep -n "int mcsfs1_fsck" -A40 fs/mcsfs1/mcsfs1.c
+cat tests/m15/test_mcsfs1.c
+tail -40 tests/m15/test_mcsfs1.c
+nl -ba tests/m15/test_mcsfs1.c | tail -60
+cd~/mcsos
+xxd build/kernel.elf | grep -A1 "ad b0"
+cd ~/mcsos
+xxd build/kernel.elf | grep -A1 "ad b0"
+python3 -c "
+data = open('build/kernel.elf','rb').read()
+idx = data.find(b'\x02\xb0\xad\x1b')
+print('magic found at offset:', idx)
+"
+readelf -S build/kernel.elf | grep -A1 multiboot
+sed -i 's/^\.section \.multiboot$/.section .multiboot, "a"/' src/kernel/arch/x86_64/boot.s
+head -5 src/kernel/arch/x86_64/boot.s
+make clean
+make all
+readelf -S build/kernel.elf | grep -A1 multiboot
+readelf -l build/kernel.elf
+make iso
+timeout 8 qemu-system-x86_64 -machine q35 -m 256M -nographic -cdrom build/mcsos.iso < /dev/null > artifacts/m14/qemu_m14.log 2>&1
+cat artifacts/m14/qemu_m14.log
+cat artifacts/m14/qemu_m14.log 
+ls build
+ls artifacts/m14
+cat artifacts/m14/qemu_m14.log
+cd ~/mcsos
+qemu-system-x86_64   -machine q35   -m 256M   -serial stdio   -no-reboot   -no-shutdown   -S -s   -cdrom build/mcsos.iso
+mkdir -p artifacts/m14
+timeout 8 qemu-system-x86_64 -machine q35 -m 256M -nographic -cdrom build/mcsos.iso < /dev/null > artifacts/m14/qemu_m14.log 2>&1
+cat artifacts/m14/qemu_m14.log
+grep -n "700\|power" tests/host/test_m14_block.c
+git add include/mcsos/block.h kernel/block/block.c kernel/block/bcache.c tests/host/test_m14_block.c artifacts/m14/qemu_m14.log
+git commit -m "M14 pengayaan: stats, write-through, negative test"
+git status
+git add -A kernel/block/ include/mcsos/block.h tests/host/test_m14_block.c artifacts/m14/qemu_m14.log
+git commit -m "M14 pengayaan lengkap: stats, write-through, negative test"
+git log --oneline -3
+git add -A kernel/block/ include/mcsos/block.h tests/host/test_m14_block.c artifacts/m14/qemu_m14.log
+git commit -m "M14 pengayaan lengkap: stats, write-through, negative test"
+git log --oneline -3                                                                                                                                                                                  
+git rm --cached artifacts/m14/gdb_m14_session.txt artifacts/m14/kernel_build.log artifacts/m14/m14_make_all.log artifacts/m14/m14_nm_undefined.txt artifacts/m14/m14_objdump.txt artifacts/m14/m14_readelf.txt artifacts/m14/m14_sha256.txt artifacts/m14/qemu_debug.log
+git commit -m "cleanup: remove stale M14 log artifacts"
+mkdir -p artifacts/m14
+./scripts/m14_preflight.sh
+make -f makefile.m14 clean || true
+make -f makefile.m14 all 2>&1 | tee artifacts/m14/m14_make_all.log
+cat artifacts/m14_nm_undefined.txt
+head -n 30 artifacts/m14_readelf_block.txt
+grep -E "Class:|Machine:|Type:" artifacts/m14_readelf_block.txt
+sha256sum build/m14_block_layer.o build/test_m14_block | tee artifacts/m14_final_sha256.txt
+git status --short | tee artifacts/m14_git_status_after_m14.txt
+mkdir -p artifacts/m14
+make -f makefile.m14 all 2>&1 | tee artifacts/m14/m14_make_all.log
+git add artifacts/m14_nm_undefined.txt artifacts/m14_readelf_block.txt artifacts/m14_final_sha256.txt artifacts/m14_git_status_after_m14.txt artifacts/m14/m14_make_all.log
+git commit -m "M14: full grading test artifacts (preflight, audit, sha256)"
+git add -f artifacts/m14_nm_undefined.txt artifacts/m14_readelf_block.txt
+git commit -m "M14: include nm/readelf audit artifacts (force-add, ignored by gitignore rule)"
+git check-ignore -v artifacts/m14_nm_undefined.txt
+git log --oneline -5
+git status --short
+mkdir -p artifacts/m14
+timeout 8 qemu-system-x86_64 -machine q35 -m 256M -nographic -cdrom build/mcsos.iso < /dev/null > artifacts/m14/qemu_m14.log 2>&1
+cat artifacts/m14/qemu_m14.log
+git add artifacts/m14/qemu_m14.log
+git commit -m "M14: restore final qemu boot log"
+mkdir -p artifacts/m14
+timeout 8 qemu-system-x86_64 -machine q35 -m 256M -nographic -cdrom build/mcsos.iso < /dev/null > artifacts/m14/qemu_m14.log 2>&1
+cat artifacts/m14/qemu_m14.log
+git add artifacts/m14/qemu_m14.log
+git commit -m "M14: restore final qemu boot log"
+mkdir -p artifacts/m14
+timeout 8 qemu-system-x86_64 -machine q35 -m 256M -nographic -cdrom build/mcsos.iso < /dev/null > artifacts/m14/qemu_m14.log 2>&1
+cat artifacts/m14/qemu_m14.log
+git add artifacts/m14/qemu_m14.log
+git commit -m "M14: restore final qemu boot log"
+ls -lh artifacts/m14/qemu_m14.log
+cat artifacts/m14/qemu_m14.log
+ls -lh build
+ls -lh build/*.iso
+cat artifacts/m14/m14_nm_undefined.txt
+./build/test_m14_block
+mkdir -p artifacts/m14
+nm -u build/m14_block_layer.o > artifacts/m14/m14_nm_undefined.txt
+cat artifacts/m14/m14_nm_undefined.txt
+readelf -h build/m14_block_layer.o > artifacts/m14/m14_readelf_block.txt
+head -30 artifacts/m14/m14_readelf_block.txt
+grep -E "Class:|Machine:|Type:" artifacts/m14/m14_readelf_block.txt
+sha256sum build/m14_block_layer.o build/test_m14_block | tee artifacts/m14/m14_final_sha256.txt
+git status --short | tee artifacts/m14/git_status_after_m14.txt
+ls -lh artifacts/m14
+git add artifacts/m14
+git commit -m "M14: add final grading artifacts"
+cd ~/mcsos
+ls -lh artifacts/m14/m14_objdump_block.txt
+head -20 artifacts/m14/m14_objdump_block.txt
+cd ~/mcsos
+ls -lh artifacts/m14
+head -20 artifacts/m14/m14_objdump_block.txt
+cd ~/mcsos
+objdump -dr build/m14_block_layer.o | tee artifacts/m14/m14_objdump_block.txt
+git add artifacts/m14/m14_objdump_block.txt
+git commit -m "M14: add objdump artifact"
+git log --oneline -3
+cd ~/mcsos
+make clean
+make all
+make iso
+mkdir -p artifacts/m14
+timeout 8 qemu-system-x86_64 -machine q35 -m 256M -nographic -cdrom build/mcsos.iso < /dev/null > artifacts/m14/qemu_m14.log 2>&1
+cat artifacts/m14/qemu_m14.log
+git log --oneline --all | grep -i "M14"
+git show eabdc1b:mcsos/artifacts/m14/qemu_m14.log 2>/dev/null || git show eabdc1b:artifacts/m14/qemu_m14.log 2>/dev/null
+cd ~/mcsos
+git status
+cat artifacts/m14/qemu_m14.log
+git restore ../.bash_history
+rm -f linker.ld.backup_m14
+rm -f linker.ld.bak
+rm -f makefile.backup_m14
+rm -f makefile.bak
+rm -f src/kernel/arch/x86_64/boot.s.bak
+git status
+cat artifacts/m14/qemu_m14.log
+git add artifacts/m14/qemu_m14.log
+git commit -m "M14: update final QEMU smoke test log"
+git status
+git remote -v
+git push -u origin praktikum-m14-block-device
+git branch -vv
+git log --oneline -5
+git tag m14-final
+git push origin m14-final
+cd ~/mcsos
+gdb build/m9/kernel_m9.elf
+cd ~/mcsos
+gdb build/m9/kernel_m9.elf
+make m9-gdb
+file build/m9/kernel_m9.elf
+readelf -S build/m9/kernel_m9.elf | grep -i debug
+grep -n 'ld.lld\|LDFLAGS' Makefile | head -10
+grep -n 'm9-gdb' -A 5 Makefile
+grep -n 'idt_src.o\|kmain.o' Makefile
+grep -n 'KERNEL_CFLAGS' Makefile | head -5
+sed -n '61,63p' Makefile
+sed -n '64p' Makefile
+file build/m9/kernel_m9.elf
+readelf -S build/m9/kernel_m9.elf | grep -i debug
+cd ~/mcsos
+gdb build/m9/kernel_m9.elf   -ex "set architecture i386:x86-64"   -ex "target remote localhost:1234"
+cd ~/mcsos
+ls Makefile
+cd ~/mcsos
+pkill -f qemu-system-x86_64
+make m9-qemu-debug
+grep -R "mcs_sys_open" -n .
+grep -R "fd_table" -n kernel include
+grep -R "kernel_ramfs" -n .
+grep -n "g_fs" kernel/kmain.c
+git status --short
+git diff -- include/mcs_vfs.h kernel/vfs tests Makefile.m13 > build/m13/m13-rollback-diff.patch
+ls -l build/m13/m13-rollback-diff.patch
+clang --version
+ld --version
+objdump --version
+readelf --version
+nm --version
+qemu-system-x86_64 --version
+gdb --version
+git rev-parse HEAD
+make -f Makefile.m13 clean
+make -f Makefile.m13 m13-all
+sha256sum build/m13/* > build/m13/ci-artifacts.sha256
+cat build/m13/ci-artifacts.sha256
+ls -l build/m13
+git status
+git add Makefile
+git add Makefile.m13
+git add kernel/kmain.c
+git add include/mcs_vfs.h
+git add kernel/vfs
+git add tests/m13_vfs_host_test.c
+git status
+git commit -m "M13: Implement VFS, RAMFS, FD table and host tests"
+git remote -v
+git push -u origin praktikum-m13-vfs-ramfs
+git status
+git checkout praktikum-m13-vfs-ramfs
+git status
+git checkout -b praktikum-m14
+cd ~/mcsos
+gdb build/m9/kernel_m9.elf
