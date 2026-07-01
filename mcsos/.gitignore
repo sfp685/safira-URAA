@@ -4,3 +4,5 @@ artifacts/m14_nm_undefined.txt
 artifacts/m14_readelf_block.txt
 artifacts/m14_objdump_block.txt
 artifacts/m14_sha256.txt
+backup/
+mcsos_final/
