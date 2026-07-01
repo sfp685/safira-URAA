@@ -6,3 +6,6 @@ artifacts/m14_objdump_block.txt
 artifacts/m14_sha256.txt
 backup/
 mcsos_final/
+backup/
+mcsos_final/
+*.bak
