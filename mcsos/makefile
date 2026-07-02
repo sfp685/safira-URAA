@@ -25,7 +25,8 @@ $(KERNEL):
 	$(CC) $(CFLAGS) -c kernel/block/block_demo.c -o $(BUILD_DIR)/block_demo.o
 	$(CC) $(CFLAGS) -c fs/mcsfs1/mcsfs1.c -o $(BUILD_DIR)/mcsfs1.o
 	$(CC) $(CFLAGS) -c fs/mcsfs1/mcsfs1_blkdev_adapter.c -o $(BUILD_DIR)/mcsfs1_blkdev_adapter.o
-	$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/boot.o $(BUILD_DIR)/kmain.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/trap.o $(BUILD_DIR)/stubs.o $(BUILD_DIR)/isr.o $(BUILD_DIR)/block.o $(BUILD_DIR)/ramblk.o $(BUILD_DIR)/bcache.o $(BUILD_DIR)/block_demo.o $(BUILD_DIR)/mcsfs1.o $(BUILD_DIR)/mcsfs1_blkdev_adapter.o
+	$(CC) $(CFLAGS) -c kernel/fs/mcsfs1j/m16_mcsfs_journal.c -o $(BUILD_DIR)/m16_mcsfs_journal.o
+	$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/boot.o $(BUILD_DIR)/kmain.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/trap.o $(BUILD_DIR)/stubs.o $(BUILD_DIR)/isr.o $(BUILD_DIR)/block.o $(BUILD_DIR)/ramblk.o $(BUILD_DIR)/bcache.o $(BUILD_DIR)/block_demo.o $(BUILD_DIR)/mcsfs1.o $(BUILD_DIR)/mcsfs1_blkdev_adapter.o $(BUILD_DIR)/m16_mcsfs_journal.o
 
 iso: $(KERNEL)
 	mkdir -p $(ISO_DIR)/boot/grub

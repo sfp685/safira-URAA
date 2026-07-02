@@ -1,0 +1,52 @@
+rm -rf build
+rm -rf artifacts/m15
+mkdir -p build
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/boot.s -o build/boot.o
+clang: warning: argument unused during compilation: '-ffreestanding' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-protector' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-check' [-Wunused-command-line-argument]
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kmain.c -o build/kmain.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/idt.c -o build/idt.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/trap.c -o build/trap.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/stubs.c -o build/stubs.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c src/kernel/arch/x86_64/isr.s -o build/isr.o
+clang: warning: argument unused during compilation: '-ffreestanding' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-protector' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-fno-stack-check' [-Wunused-command-line-argument]
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/block/block.c -o build/block.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/block/ramblk.c -o build/ramblk.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/block/bcache.c -o build/bcache.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/block/block_demo.c -o build/block_demo.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c fs/mcsfs1/mcsfs1.c -o build/mcsfs1.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c fs/mcsfs1/mcsfs1_blkdev_adapter.c -o build/mcsfs1_blkdev_adapter.o
+clang -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Isrc/kernel/arch/x86_64 -Isrc/kernel -I. -Iinclude -c kernel/fs/mcsfs1j/m16_mcsfs_journal.c -o build/m16_mcsfs_journal.o
+ld.lld -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=build/kernel.map -o build/kernel.elf build/boot.o build/kmain.o build/idt.o build/trap.o build/stubs.o build/isr.o build/block.o build/ramblk.o build/bcache.o build/block_demo.o build/mcsfs1.o build/mcsfs1_blkdev_adapter.o build/m16_mcsfs_journal.o
+mkdir -p build/isodir/boot/grub
+cp build/kernel.elf build/isodir/boot/kernel.elf
+cp build/isodir/boot/grub/grub.cfg build/isodir/boot/grub/grub.cfg 2>/dev/null || true
+echo 'serial --unit=0 --speed=9600' > build/isodir/boot/grub/grub.cfg
+echo 'terminal_input serial' >> build/isodir/boot/grub/grub.cfg
+echo 'terminal_output serial' >> build/isodir/boot/grub/grub.cfg
+echo 'set timeout=0' >> build/isodir/boot/grub/grub.cfg
+echo 'set timeout_style=hidden' >> build/isodir/boot/grub/grub.cfg
+echo 'set default=0' >> build/isodir/boot/grub/grub.cfg
+echo 'menuentry "MCSOS" {' >> build/isodir/boot/grub/grub.cfg
+echo '    multiboot /boot/kernel.elf' >> build/isodir/boot/grub/grub.cfg
+echo '    boot' >> build/isodir/boot/grub/grub.cfg
+echo '}' >> build/isodir/boot/grub/grub.cfg
+grub-mkrescue -o build/mcsos.iso build/isodir
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:build/mcsos.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  952g free
+Added to ISO image: directory '/'='/tmp/grub.b1M7LP'
+xorriso : UPDATE :     588 files added in 1 seconds
+Added to ISO image: directory '/'='/home/user/mcsos/build/isodir'
+xorriso : UPDATE :     592 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5814 sectors
+Written to medium : 5814 sectors at LBA 0
+Writing to 'stdio:build/mcsos.iso' completed successfully.
+

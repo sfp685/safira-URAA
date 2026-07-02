@@ -1,0 +1,10 @@
+[H[J[1;1HHalo Safira, Kernel M6 berhasil jalan!
+M14: block layer initialized
+[M14] block device registered: ram0
+[M15] mcsfs1_format OK
+M15: mcsfs1 mounted, boot log reached
+[M16] mcsfs1j subsystem init
+[M16] m16_format OK
+[M16] mcsfs1j mounted, journal replay (m16_journal_recover) OK
+[M16] m16_fsck PASS
+M16: boot path smoke test complete

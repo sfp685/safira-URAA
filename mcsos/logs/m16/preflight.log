@@ -1,0 +1,31 @@
+== M16 preflight ==
+2026-07-01T19:35:27+07:00
+== host ==
+Linux DESKTOP-9H6BVAA 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.4 LTS
+Release:	24.04
+Codename:	noble
+== tools ==
+Ubuntu clang version 18.1.3 (1ubuntu1)
+GNU Make 4.3
+GNU nm (GNU Binutils for Ubuntu) 2.42
+GNU readelf (GNU Binutils for Ubuntu) 2.42
+GNU objdump (GNU Binutils for Ubuntu) 2.42
+sha256sum (GNU coreutils) 9.4
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.17)
+== git ==
+?? logs/
+?? scripts/m16_preflight.sh
+62f36d6
+== subsystem probes ==
+kernel/arch/x86_64/idt.c
+kernel/arch/x86_64/isr.S
+kernel/block/bcache.c
+kernel/block/block.c
+kernel/block/block_demo.c
+kernel/block/ramblk.c
+kernel/core/trap.c
+kernel/kmain.c
+kernel/mcsos/arch/idt.h
+kernel/mcsos/arch/isr.h
