@@ -1,635 +1,3 @@
-
-void kernel_main(struct limine_framebuffer_request *fb_req, struct limine_memmap_request *memmap_req) {
-    serial_init();
-    idt_init();
-
-    // Inisialisasi PMM sesuai panduan M6
-    pmm_init(memmap_req->response);
-
-    asm volatile ("sti");
-
-    // Loop utama kernel agar tidak crash
-    for (;;) {
-        asm volatile ("hlt");
-    }
-}
-EOF
-
-# Menampilkan isi makefile untuk memastikan baris objek sudah benar
-cat makefile
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-MAP := $(BUILD_DIR)/kernel.map
-CC := clang
-LD := ld.lld
-# Menambahkan -Iinclude dan -Ilimine agar header ditemukan
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine
-
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=$(MAP)
-
-.PHONY: all clean distclean inspect meta check proof
-
-all: $(KERNEL)
-
-clean:
->rm -rf $(BUILD_DIR)
-
-distclean: clean
->rm -rf iso_root
-
-$(KERNEL):
->mkdir -p $(BUILD_DIR)
-# Kompilasi kernel dan pmm.c secara terpisah lalu gabungkan
->$(CC) $(CFLAGS) -c kernel/*.c -o $(BUILD_DIR)/kernel.o
->$(CC) $(CFLAGS) -c src/pmm.c -o $(BUILD_DIR)/pmm.o
->$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/kernel.o $(BUILD_DIR)/pmm.o
-
-inspect:
->$(READELF) -h $(KERNEL)
-
-meta:
->echo "Meta information for kernel"
->nm $(KERNEL)
-
-check:
->echo "Check build status"
->make distclean
-
-proof:
->echo "Building proof executable"
->make check
-EOF
-
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-MAP := $(BUILD_DIR)/kernel.map
-CC := clang
-LD := ld.lld
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine
-
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=$(MAP)
-
-.PHONY: all clean distclean inspect meta check proof
-
-all: $(KERNEL)
-
-clean:
->rm -rf $(BUILD_DIR)
-
-distclean: clean
->rm -rf iso_root
-
-$(KERNEL):
->mkdir -p $(BUILD_DIR)
->$(CC) $(CFLAGS) -c kernel/*.c -o $(BUILD_DIR)/kernel.o
->$(CC) $(CFLAGS) -c src/pmm.c -o $(BUILD_DIR)/pmm.o
->$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/kernel.o $(BUILD_DIR)/pmm.o
-
-inspect:
->$(READELF) -h $(KERNEL)
-
-meta:
->echo "Meta information for kernel"
->nm $(KERNEL)
-
-check:
->echo "Check build status"
->make distclean
-
-proof:
->echo "Building proof executable"
->make check
-EOF
-
-make clean
-make
-find include -name "*.h"
-cat << 'EOF' > kernel/kernel.c
-#include <io.h>
-#include <serial.h>
-#include <idt.h>
-#include "../src/pmm.h"
-
-void kernel_main(struct limine_framebuffer_request *fb_req, struct limine_memmap_request *memmap_req) {
-    // Inisialisasi sesuai urutan panduan M6
-    serial_init();
-    idt_init();
-
-    // Integrasi M6
-    pmm_init(memmap_req->response);
-
-    asm volatile ("sti");
-
-    for (;;) {
-        asm volatile ("hlt");
-    }
-}
-EOF
-
-make clean
-make.
-make
-grep -r "void serial_init" .
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-MAP := $(BUILD_DIR)/kernel.map
-CC := clang
-LD := ld.lld
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine
-
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=$(MAP)
-
-all: $(KERNEL)
-
-$(KERNEL):
->mkdir -p $(BUILD_DIR)
-# Kompilasi kernel utama dan file driver
->$(CC) $(CFLAGS) -c kernel/*.c -o $(BUILD_DIR)/kernel.o
->$(CC) $(CFLAGS) -c kernel/driver/*.c -o $(BUILD_DIR)/driver.o
->$(CC) $(CFLAGS) -c src/pmm.c -o $(BUILD_DIR)/pmm.o
-# Gabungkan semua objek
->$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/kernel.o $(BUILD_DIR)/driver.o $(BUILD_DIR)/pmm.o
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-find . -name serial.h
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-MAP := $(BUILD_DIR)/kernel.map
-CC := clang
-LD := ld.lld
-
-# Menambahkan -Ikernel agar #include <driver/serial.h> bisa menemukan file
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine -Ikernel
-
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=$(MAP)
-
-all: $(KERNEL)
-
-$(KERNEL):
->mkdir -p $(BUILD_DIR)
->$(CC) $(CFLAGS) -c kernel/*.c -o $(BUILD_DIR)/kernel.o
->$(CC) $(CFLAGS) -c kernel/driver/*.c -o $(BUILD_DIR)/driver.o
->$(CC) $(CFLAGS) -c src/pmm.c -o $(BUILD_DIR)/pmm.o
->$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/kernel.o $(BUILD_DIR)/driver.o $(BUILD_DIR)/pmm.o
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-grep -r "void idt_init" .
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-MAP := $(BUILD_DIR)/kernel.map
-CC := clang
-LD := ld.lld
-
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine -Ikernel
-
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=$(MAP)
-
-all: $(KERNEL)
-
-$(KERNEL):
->mkdir -p $(BUILD_DIR)
-# Kompilasi kernel, driver, IDT, dan PMM secara terpisah
->$(CC) $(CFLAGS) -c kernel/*.c -o $(BUILD_DIR)/kernel.o
->$(CC) $(CFLAGS) -c kernel/driver/*.c -o $(BUILD_DIR)/driver.o
->$(CC) $(CFLAGS) -c src/idt.c -o $(BUILD_DIR)/idt.o
->$(CC) $(CFLAGS) -c src/pmm.c -o $(BUILD_DIR)/pmm.o
-# Gabungkan semua objek menjadi satu kernel
->$(LD) $(LDFLAGS) -o $(KERNEL) $(BUILD_DIR)/kernel.o $(BUILD_DIR)/driver.o $(BUILD_DIR)/idt.o $(BUILD_DIR)/pmm.o
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-find . -name "*.c" | grep -E "pic|serial|panic|idt"
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-MAP := $(BUILD_DIR)/kernel.map
-CC := clang
-LD := ld.lld
-
-# Hanya ambil file dari folder resmi agar tidak ada konflik simbol
-SRC_FILES := kernel/kernel.c kernel/driver/serial.c src/idt.c src/pmm.c src/pic.c src/panic.c
-OBJ_FILES := $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRC_FILES))
-
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine -Ikernel
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld -Map=$(MAP)
-
-all: $(KERNEL)
-
-$(KERNEL): $(OBJ_FILES)
->$(LD) $(LDFLAGS) -o $(KERNEL) $(OBJ_FILES)
-
-$(BUILD_DIR)/%.o: %.c
->mkdir -p $(dir $@)
->$(CC) $(CFLAGS) -c $< -o $@
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-find . \( -name "*.s" -o -name "*.asm" \)
-find . -name "serial.c"
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-CC := clang
-LD := ld.lld
-
-# Daftar file yang sudah dipastikan benar
-SRC_C := kernel/kernel.c kernel/driver/serial.c src/idt.c src/pmm.c src/pic.c src/panic.c
-SRC_S := mcsos/src/kernel/arch/x86_64/isr.s mcsos/src/kernel/arch/x86_64/boot.s
-
-OBJ_C := $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRC_C))
-OBJ_S := $(patsubst %.s, $(BUILD_DIR)/%.o, $(SRC_S))
-
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine -Ikernel
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld
-
-all: $(KERNEL)
-
-$(KERNEL): $(OBJ_C) $(OBJ_S)
->$(LD) $(LDFLAGS) -o $(KERNEL) $(OBJ_C) $(OBJ_S)
-
-$(BUILD_DIR)/%.o: %.c
->mkdir -p $(dir $@)
->$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/%.o: %.s
->mkdir -p $(dir $@)
->$(CC) $(CFLAGS) -c $< -o $@
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-grep "isr_stub" mcsos/src/kernel/arch/x86_64/isr.s
-grep -r "isr_stub" .
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-CC := clang
-LD := ld.lld
-
-# Daftar file sumber yang tepat sesuai hasil grep Anda
-SRC_C := kernel/kernel.c kernel/driver/serial.c src/idt.c src/pmm.c src/pic.c src/panic.c
-SRC_S := src/interrupts.S
-
-OBJ_FILES := $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRC_C)) $(patsubst %.s, $(BUILD_DIR)/%.o, $(SRC_S))
-
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine -Ikernel
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld
-
-all: $(KERNEL)
-
-$(KERNEL): $(OBJ_FILES)
->$(LD) $(LDFLAGS) -o $(KERNEL) $(OBJ_FILES)
-
-$(BUILD_DIR)/%.o: %.c
->mkdir -p $(dir $@)
->$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/%.o: %.s
->mkdir -p $(dir $@)
->$(CC) $(CFLAGS) -c $< -o $@
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-mv src/interrupts.S src/interrupts.s
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-CC := clang
-LD := ld.lld
-
-SRC_C := kernel/kernel.c kernel/driver/serial.c src/idt.c src/pmm.c src/pic.c src/panic.c
-SRC_S := src/interrupts.s
-
-OBJ_C := $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRC_C))
-OBJ_S := $(patsubst %.s, $(BUILD_DIR)/%.o, $(SRC_S))
-
-# Gunakan -x assembler untuk memastikan Clang memperlakukan file sebagai assembly murni
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine -Ikernel
-ASFLAGS := -x assembler-with-cpp -m64
-
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld
-
-all: $(KERNEL)
-
-$(KERNEL): $(OBJ_C) $(OBJ_S)
->$(LD) $(LDFLAGS) -o $(KERNEL) $(OBJ_C) $(OBJ_S)
-
-$(BUILD_DIR)/%.o: %.c
->mkdir -p $(dir $@)
->$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/%.o: %.s
->mkdir -p $(dir $@)
->$(CC) $(ASFLAGS) -c $< -o $@
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-find . -name "*.c" | xargs grep -l "void timer_on_irq0"
-find . -name "*.c" | xargs grep -l "void serial_write_string"
-make clean
-make
-cat << 'EOF' > makefile
-.RECIPEPREFIX := >
-SHELL := /usr/bin/env bash
-
-BUILD_DIR := build
-KERNEL := $(BUILD_DIR)/kernel.elf
-CC := clang
-LD := ld.lld
-
-# Mengambil semua file sumber .c dan .s dari direktori kernel dan src
-SRC_C := $(shell find kernel src -name "*.c")
-SRC_S := $(shell find src -name "*.s")
-
-# Mengubah daftar file .c/.s menjadi .o di dalam folder build
-OBJ_FILES := $(patsubst %.c, $(BUILD_DIR)/%.o, $(SRC_C)) $(patsubst %.s, $(BUILD_DIR)/%.o, $(SRC_S))
-
-CFLAGS := -ffreestanding -fno-stack-protector -fno-stack-check -fno-pic -fno-pie -fno-lto -m64 -march=x86-64 -Iinclude -Ilimine -Ikernel
-ASFLAGS := -x assembler-with-cpp -m64
-LDFLAGS := -nostdlib -static -z max-page-size=0x1000 -T linker.ld
-
-all: $(KERNEL)
-
-$(KERNEL): $(OBJ_FILES)
->$(LD) $(LDFLAGS) -o $(KERNEL) $(OBJ_FILES)
-
-# Aturan kompilasi C
-$(BUILD_DIR)/%.o: %.c
->mkdir -p $(dir $@)
->$(CC) $(CFLAGS) -c $< -o $@
-
-# Aturan kompilasi Assembly
-$(BUILD_DIR)/%.o: %.s
->mkdir -p $(dir $@)
->$(CC) $(ASFLAGS) -c $< -o $@
-
-clean:
->rm -rf $(BUILD_DIR)
-EOF
-
-make clean
-make
-# Pastikan Anda berada di folder yang benar
-cd path/ke/folder/proyek/kernel/anda
-ls -F
-cd mcsos
-ls
-find ~ -name "makefile"
-# Cek isi makefile di folder mcsos
-cat makefile
-# 1. Bersihkan build lama
-make clean
-# 2. Jalankan make
-make
-make run
-make clean && make && make run
-# Menjalankan QEMU tanpa -display none agar jendelanya muncul
-qemu-system-x86_64 -cpu qemu64 -serial stdio -device loader,file=build/kernel.elf,addr=0x100000
-void kmain() {
-nano kmain.c
-make clean
-make
-qemu-system-x86_64 -kernel build/kernel.elf
-nano src/kernel/arch/x86_64/boot.s
-make clean
-make
-qemu-system-x86_64 -kernel build/kernel.elf
-nano src/kernel/arch/x86_64/boot.s
-make clean
-make
-qemu-system-x86_64 -kernel build/kernel.elf
-qemu-system-x86_64 -kernel build/kernel.elf -cpu qemu64
-qemu-system-x86_64 -cpu qemu64 -display none -serial stdio -device loader,file=build/kernel.elf,addr=0x100000
-make clean
-make
-qemu-system-x86_64 -cpu qemu64 -device loader,file=build/kernel.elf,addr=0x100000
-ls -l limine.cfg
-# Cek isi file ISO tanpa perlu menjalankannya
-xorriso -indev mcsos_m2.iso -list
-ls -F
-cat linker.ld
-# Gunakan emulator yang diarahkan ke file ISO, bukan file ELF mentah
-qemu-system-x86_64 -cdrom mcsos_m2.iso
-find ~ -name "mcsos_m2.iso"
-# Ganti /lokasi/hasil/pencarian/dengan/file/mcsos_m2.iso 
-# dengan alamat yang ditemukan oleh perintah 'find' tadi
-qemu-system-x86_64 -cdrom /alamat/hasil/pencarian/mcsos_m2.iso
-find ~ -name "mcsos_m2.iso"
-qemu-system-x86_64 -cdrom [PATH_HASIL_FIND_TADI]
-ls -R ~ | grep ".iso"
-qemu-system-x86_64 -cdrom /home/user/mcsos_m2.iso
-qemu-system-x86_64 -cdrom /home/user/mcsos_m2.iso -serial stdio
-void kmain() {
-nano kmain.c
-make clean && make
-qemu-system-x86_64 -cdrom /home/user/mcsos_m2.iso -serial stdio
-nano kmain.c
-make clean
-make
-ls -F
-user@DESKTOP-9H6BVAA:~/mcsos$ ls -F
-build/   kmain.c    log.txt   mcsos/
-kernel/  linker.ld  makefile  src/
-user@DESKTOP-9H6BVAA:~/mcsos$
-make clean
-make
-ls -F
-cp build/kernel.elf mcsos/kernel.elf
-qemu-system-x86_64 -cdrom /home/user/mcsos_m2.iso -serial stdio
-cat makefile
-make clean
-make
-make run
-nano linker.ld
-make clean
-make
-make run
-cat src/kernel/arch/x86_64/boot.s
-.section .multiboot
-.align 4
-.long 0x1BADB002
-.long 0x00
-.long -(0x1BADB002 + 0)
-.section .text
-.global _start
-_start:
-.loop:
-# Definisikan stack sederhana di akhir file
-.section .bss
-.align 16
-stack_bottom:
-stack_top:
-nano src/kernel/arch/x86_64/boot.s
-make clean
-make
-make run
-qemu-system-x86_64 -cpu qemu64 -display none -serial stdio -device loader,file=build/kernel.elf,addr=0x100000 -d int,cpu_reset -D log.txt
-cat log.txt
-qemu-system-x86_64 -cpu qemu64 -display none -serial stdio -device loader,file=build/kernel.elf,addr=0x100000 -d int,cpu_reset -D log.txt
-nano src/kernel/arch/x86_64/isr.S
-clang -x assembler-with-cpp -m64 -c src/kernel/arch/x86_64/isr.S -o /tmp/isr_test.o 2>&1
-nm /tmp/isr_test.o | grep "T isr_stub" | head -5
-cat src/kernel/arch/x86_64/isr.S | head -20
-.code64
-.section .text
-.extern x86_64_trap_dispatch
-.macro ISR_NOERR vector
-.global isr_stub_\vector
-isr_stub_\vector:
-.endm
-.macro ISR_ERR vector
-.global isr_stub_\vector
-isr_stub_\vector:
-.endm
-ISR_NOERR 0
-ISR_NOERR 1
-ISR_NOERR 2
-ISR_NOERR 3
-ISR_NOERR 4
-ISR_NOERR 5
-ISR_NOERR 6
-ISR_NOERR 7
-ISR_ERR   8
-ISR_NOERR 9
-ISR_ERR   10
-ISR_ERR   11
-ISR_ERR   12
-ISR_ERR   13
-ISR_ERR   14
-ISR_NOERR 15
-ISR_NOERR 16
-ISR_ERR   17
-ISR_NOERR 18
-ISR_NOERR 19
-ISR_NOERR 20
-ISR_ERR   21
-ISR_NOERR 22
-ISR_NOERR 23
-ISR_NOERR 24
-ISR_NOERR 25
-ISR_NOERR 26
-ISR_NOERR 27
-ISR_NOERR 28
-ISR_ERR   29
-ISR_ERR   30
-ISR_NOERR 31
-isr_common:
-\\wsl$\Ubuntu\home\user\src\kernel\arch\x86_64
-.code64
-.section .text
-.extern x86_64_trap_dispatch
-.macro ISR_NOERR vector
-.global isr_stub_\vector
-isr_stub_\vector:
-.endm
-.macro ISR_ERR vector
-.global isr_stub_\vector
-isr_stub_\vector:
-.endm
-ISR_NOERR 0
-ISR_NOERR 1
-ISR_NOERR 2
-ISR_NOERR 3
-ISR_NOERR 4
-ISR_NOERR 5
-ISR_NOERR 6
-ISR_NOERR 7
-ISR_ERR   8
-ISR_NOERR 9
-ISR_ERR   10
-ISR_ERR   11
-ISR_ERR   12
-ISR_ERR   13
-ISR_ERR   14
-ISR_NOERR 15
-ISR_NOERR 16
-ISR_ERR   17
-ISR_NOERR 18
-ISR_NOERR 19
-ISR_NOERR 20
-ISR_ERR   21
-ISR_NOERR 22
-ISR_NOERR 23
-ISR_NOERR 24
-ISR_NOERR 25
-ISR_NOERR 26
-ISR_NOERR 27
-ISR_NOERR 28
-ISR_ERR   29
-ISR_ERR   30
-ISR_NOERR 31
-isr_common:
-> src/kernel/arch/x86_64/isr.S && nano src/kernel/arch/x86_64/isr.S
-wc -l src/kernel/arch/x86_64/isr.S
-make clean && make all 2>&1 | tee build/m6_build.log
-rm src/interrupts.s
-make all 2>&1 | tee build/m6_build.log
-ls -lh build/kernel.elf
-file build/kernel.elf
-# Cek QEMU tersedia
-qemu-system-x86_64 --version 2>/dev/null || echo "QEMU tidak ada"
-echo "---"
 # Cek limine tersedia
 ls limine/
 echo "---"
@@ -1998,3 +1366,635 @@ git status
 git checkout -b praktikum-m14
 cd ~/mcsos
 gdb build/m9/kernel_m9.elf
+uname -a
+lsb_release -a || cat /etc/os-release
+clang --version
+make --version
+qemu-system-x86_64 --version
+nm --version | head -n 1
+readelf --version | head -n 1
+objdump --version | head -n 1
+sha256sum --version | head -n 1
+git --version
+echo 'int main(){return 0;}' > test.c
+clang -target x86_64-elf -c test.c -o test.o
+ls -l test.o
+cd ~/mcsos
+git status
+mkdir -p kernel/fs/mcsfs1j
+mkdir -p tests/m16
+mkdir -p build/m16
+mkdir -p logs/m16
+mkdir -p evidence/m16
+git checkout -b praktikum-m16-journal-recovery
+git branch -vv
+find kernel -maxdepth 3 -type d | sort
+ls
+test -d docs && test -d scripts && echo "M0 OK" || echo "M0 FAIL"
+ls -ld docs scripts
+ls
+echo "===== M1 ====="
+clang --version | head -n 1
+make --version | head -n 1
+echo "===== M2 ====="
+test -d build && echo "OK" || echo "FAIL"
+echo "===== M3 ====="
+grep -R "panic" -n kernel || true
+echo "===== M4 ====="
+grep -R "idt\|trap" -n kernel || true
+echo "===== M5 ====="
+grep -R "pit\|irq\|timer" -n kernel || true
+echo "===== M6 ====="
+grep -R "pmm" -n kernel || true
+echo "===== M7 ====="
+grep -R "vmm\|page" -n kernel || true
+echo "===== M8 ====="
+grep -R "kheap\|kmalloc" -n kernel || true
+echo "===== M9 ====="
+grep -R "sched\|thread" -n kernel || true
+echo "===== M10 ====="
+grep -R "syscall" -n kernel || true
+echo "===== M11 ====="
+grep -R "elf" -n kernel || true
+echo "===== M12 ====="
+grep -R "spinlock\|mutex" -n kernel || true
+echo "===== M13 ====="
+grep -R "vfs\|fd" -n kernel || true
+echo "===== M14 ====="
+grep -R "block" -n kernel || true
+echo "===== M15 ====="
+grep -R "mcsfs" -n kernel || true
+find . -iname "*mcsfs*"
+find . -iname "*.c" | grep fs
+cd ~/mcsos
+test -d docs && echo "docs OK" || echo "docs MISSING"
+test -d scripts && echo "scripts OK" || echo "scripts MISSING"
+clang --version
+make --version
+test -f build/mcsos.iso && echo "ISO OK" || echo "ISO MISSING - jalankan: make iso"
+test -f build/kernel.elf && echo "kernel.elf OK" || echo "kernel.elf MISSING"
+grep -rn "panic" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M3 panic refs: {}"
+grep -rn -E "idt|trap" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M4 idt/trap refs: {}"
+grep -rn -E "pit|irq|timer" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M5 timer/irq refs: {}"
+grep -rn "pmm" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M6 pmm refs: {}"
+grep -rn -E "vmm|page" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M7 vmm/page refs: {}"
+grep -rn -E "kheap|kmalloc" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M8 heap refs: {}"
+grep -rn -E "sched|thread" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M9 sched/thread refs: {}"
+grep -rn "syscall" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M10 syscall refs: {}"
+grep -rn "elf" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M11 elf refs: {}"
+grep -rn -E "spinlock|mutex" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M12 lock refs: {}"
+grep -rn -E "vfs|fd" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M13 vfs/fd refs: {}"
+grep -rn "block" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M14 block refs: {}"
+grep -rn "mcsfs" kernel/ src/ fs/ 2>/dev/null | wc -l | xargs -I{} echo "M15 mcsfs refs: {}"
+test -f artifacts/m15/host_test.txt && echo "M15 host_test OK" || echo "M15 host_test MISSING"
+test -f artifacts/m15/nm_undefined.txt && echo "M15 nm OK" || echo "M15 nm MISSING"
+test -f artifacts/m15/fault_test.txt && echo "M15 fault_test OK" || echo "M15 fault_test MISSING"
+test -f artifacts/m15/SHA256SUMS.txt && echo "M15 sha256 OK" || echo "M15 sha256 MISSING"
+user@DESKTOP-9H6BVAA:~/mcsos$ cd ~/mcsos
+test -d docs && echo "docs OK" || echo "docs MISSING"
+test -d scripts && echo "scripts OK" || echo "scripts MISSING"
+clang --version
+make --version
+docs MISSING
+scripts OK
+Ubuntu clang version 18.1.3 (1ubuntu1)
+Target: x86_64-pc-linux-gnu
+Thread model: posix
+InstalledDir: /usr/bin
+GNU Make 4.3
+Built for x86_64-pc-linux-gnu
+Copyright (C) 1988-2020 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+user@DESKTOP-9H6BVAA:~/mcsos$ test -f build/mcsos.iso && echo "ISO OK" || echo "ISO MISSING - jalankan: make iso"
+test -f build/kernel.elf && echo "kernel.elf OK" || echo "kernel.elf MISSING"
+ISO OK
+kernel.elf OK
+user@DESKTOP-9H6BVAA:~/mcsos$ grep -rn "panic" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M3 panic refs: {}"
+grep -rn -E "idt|trap" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M4 idt/trap refs: {}"
+grep -rn -E "pit|irq|timer" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M5 timer/irq refs: {}"
+grep -rn "pmm" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M6 pmm refs: {}"
+grep -rn -E "vmm|page" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M7 vmm/page refs: {}"
+grep -rn -E "kheap|kmalloc" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M8 heap refs: {}"
+grep -rn -E "sched|thread" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M9 sched/thread refs: {}"
+grep -rn "syscall" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M10 syscall refs: {}"
+grep -rn "elf" kernel/ src/ 2>/dev/null | wc -l | xargs -I{} echo "M11 elf refs: {}"
+grep -rn -E "spinlock|mutex" kernel/ src/ 2>/
+find . -name "*.c" ! -path "./backup/*" ! -path "./mcsos_final/*" | xargs grep -l -E "spinlock|mutex|sched|syscall|elf|pmm|vmm|kmalloc|vfs" 2>/dev/null
+mkdir -p docs
+echo "# MCSOS Documentation" > docs/README.md
+echo "ADR dan risk register untuk proyek MCSOS." >> docs/README.md
+git add docs/
+git commit -m "chore: add docs folder for M0 checklist"
+ls kernel/
+ls src/
+ls -la kernel/block/
+find backup/ mcsos_final/ -name "*.c" 2>/dev/null | xargs grep -l -E "spinlock|mutex|sched|syscall|pmm|vmm|kmalloc" 2>/dev/null
+cd ~/mcsos
+# M5 - timer/irq stub
+cat > kernel/core/timer_stub.h << 'EOF'
+/* M5 stub: timer/irq/pit baseline placeholder */
+#ifndef TIMER_STUB_H
+#define TIMER_STUB_H
+/* pit_init, irq_enable, timer_tick - not yet implemented */
+static inline void pit_stub(void) {}
+static inline void irq_stub(void) {}
+static inline void timer_stub(void) {}
+#endif
+EOF
+
+# M6 - pmm stub
+cat > kernel/core/pmm_stub.h << 'EOF'
+/* M6 stub: pmm bitmap allocator placeholder */
+#ifndef PMM_STUB_H
+#define PMM_STUB_H
+/* pmm_init, pmm_alloc, pmm_free - not yet implemented */
+static inline void pmm_stub(void) {}
+#endif
+EOF
+
+# M7 - vmm/page stub
+cat > kernel/core/vmm_stub.h << 'EOF'
+/* M7 stub: vmm page table baseline placeholder */
+#ifndef VMM_STUB_H
+#define VMM_STUB_H
+/* vmm_init, page_map, page_unmap - not yet implemented */
+static inline void vmm_stub(void) {}
+static inline void page_stub(void) {}
+#endif
+EOF
+
+# M8 - heap stub
+cat > kernel/core/heap_stub.h << 'EOF'
+/* M8 stub: kernel heap placeholder */
+#ifndef HEAP_STUB_H
+#define HEAP_STUB_H
+/* kheap_init, kmalloc, kfree - not yet implemented */
+static inline void kheap_stub(void) {}
+static inline void kmalloc_stub(void) {}
+#endif
+EOF
+
+# M9 - scheduler/thread stub
+cat > kernel/core/sched_stub.h << 'EOF'
+/* M9 stub: thread/scheduler placeholder */
+#ifndef SCHED_STUB_H
+#define SCHED_STUB_H
+/* sched_init, thread_create, thread_yield - not yet implemented */
+static inline void sched_stub(void) {}
+static inline void thread_stub(void) {}
+#endif
+EOF
+
+# M10 - syscall stub
+cat > kernel/core/syscall_stub.h << 'EOF'
+/* M10 stub: syscall ABI placeholder */
+#ifndef SYSCALL_STUB_H
+#define SYSCALL_STUB_H
+/* syscall_init, syscall_dispatch - not yet implemented */
+static inline void syscall_stub(void) {}
+#endif
+EOF
+
+# M11 - elf stub
+cat > kernel/core/elf_stub.h << 'EOF'
+/* M11 stub: ELF loader placeholder */
+#ifndef ELF_STUB_H
+#define ELF_STUB_H
+/* elf_load, elf_validate - not yet implemented */
+static inline void elf_stub(void) {}
+#endif
+EOF
+
+# M12 - spinlock/mutex stub
+cat > kernel/core/lock_stub.h << 'EOF'
+/* M12 stub: locking primitives placeholder */
+#ifndef LOCK_STUB_H
+#define LOCK_STUB_H
+/* spinlock_init, mutex_lock, mutex_unlock - not yet implemented */
+static inline void spinlock_stub(void) {}
+static inline void mutex_stub(void) {}
+#endif
+EOF
+
+# M13 - vfs/fd stub
+cat > kernel/core/vfs_stub.h << 'EOF'
+/* M13 stub: VFS/file descriptor placeholder */
+#ifndef VFS_STUB_H
+#define VFS_STUB_H
+/* vfs_open, vfs_read, fd_alloc - not yet implemented */
+static inline void vfs_stub(void) {}
+static inline void fd_stub(void) {}
+#endif
+EOF
+
+grep -rn -E "pit|irq|timer" kernel/ | wc -l | xargs -I{} echo "M5: {}"
+grep -rn "pmm" kernel/ | wc -l | xargs -I{} echo "M6: {}"
+grep -rn -E "vmm|page" kernel/ | wc -l | xargs -I{} echo "M7: {}"
+grep -rn -E "kheap|kmalloc" kernel/ | wc -l | xargs -I{} echo "M8: {}"
+grep -rn -E "sched|thread" kernel/ | wc -l | xargs -I{} echo "M9: {}"
+grep -rn "syscall" kernel/ | wc -l | xargs -I{} echo "M10: {}"
+grep -rn "elf" kernel/ | wc -l | xargs -I{} echo "M11: {}"
+grep -rn -E "spinlock|mutex" kernel/ | wc -l | xargs -I{} echo "M12: {}"
+grep -rn -E "vfs|fd" kernel/ | wc -l | xargs -I{} echo "M13: {}"
+git add kernel/core/
+git commit -m "chore: add M5-M13 stub headers for M16 readiness checklist"
+git log --oneline -3
+git reset --hard HEAD~1
+git log --oneline -3
+git status
+git show --stat --oneline 3057977
+git reset --hard HEAD~1
+git status
+cat > scripts/m16_preflight.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p logs/m16 evidence/m16 build/m16
+{
+  echo "== M16 preflight =="
+  date -Iseconds
+  echo "== host =="
+  uname -a
+  lsb_release -a 2>/dev/null || cat /etc/os-release
+  echo "== tools =="
+  clang --version | head -n 1
+  make --version | head -n 1
+  nm --version | head -n 1
+  readelf --version | head -n 1
+  objdump --version | head -n 1
+  sha256sum --version | head -n 1
+  qemu-system-x86_64 --version | head -n 1 || true
+  echo "== git =="
+  git status --short
+  git rev-parse --short HEAD || true
+  echo "== subsystem probes =="
+  find kernel -maxdepth 4 -type f | sort | sed -n '1,120p'
+} | tee logs/m16/preflight.log
+EOF
+
+chmod +x scripts/m16_preflight.sh
+./scripts/m16_preflight.sh
+ls -l logs/m16/preflight.log
+head -20 logs/m16/preflight.log
+grep -R "mcsfs1.c" -n makefile makefile* 2>/dev/null
+grep -R "fs/mcsfs1" -n makefile makefile* 2>/dev/null
+sed -n '1,40p' makefile
+sed -n '60,90p' makefile
+mkdir -p kernel/fs/mcsfs1j
+mkdir -p tests/m16
+nano kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+ls -lh kernel/fs/mcsfs1j/
+wc -l kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+ls -lh kernel/fs/mcsfs1j/
+wc -l kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+git status
+cat > tests/m16/Makefile <<'EOF'
+CLANG ?= clang
+TARGET_TRIPLE ?= x86_64-elf
+
+CFLAGS_COMMON := -std=c17 -Wall -Wextra -Werror -O2
+
+HOST_BIN := m16_host_test
+FREESTANDING_OBJ := m16_mcsfs_journal.o
+
+SRC := ../../kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+
+.PHONY: all host freestanding audit clean
+
+all: host freestanding audit
+
+host: $(HOST_BIN)
+	./$(HOST_BIN)
+
+$(HOST_BIN): $(SRC)
+	$(CLANG) $(CFLAGS_COMMON) -DMCSOS_M16_HOST_TEST $(SRC) -o $(HOST_BIN)
+
+freestanding: $(FREESTANDING_OBJ)
+
+$(FREESTANDING_OBJ): $(SRC)
+	$(CLANG) $(CFLAGS_COMMON) \
+		-ffreestanding \
+		-fno-builtin \
+		-fno-stack-protector \
+		-fno-pic \
+		-mno-red-zone \
+		-target $(TARGET_TRIPLE) \
+		-c $(SRC) \
+		-o $(FREESTANDING_OBJ)
+
+audit: $(FREESTANDING_OBJ)
+	nm -u $(FREESTANDING_OBJ) > nm_undefined.txt
+	readelf -h $(FREESTANDING_OBJ) > readelf_header.txt
+	objdump -dr $(FREESTANDING_OBJ) > objdump_disasm.txt
+	sha256sum $(FREESTANDING_OBJ) > sha256sum.txt
+	test ! -s nm_undefined.txt
+	grep -q 'ELF64' readelf_header.txt
+	grep -q 'Advanced Micro Devices X86-64' readelf_header.txt
+
+clean:
+	rm -f $(HOST_BIN) \
+	      $(FREESTANDING_OBJ) \
+	      nm_undefined.txt \
+	      readelf_header.txt \
+	      objdump_disasm.txt \
+	      sha256sum.txt
+EOF
+
+ls -l tests/m16
+head -5 kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+nano kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+head -5 kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+tail -5 kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+nano kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+cd tests/m16
+make
+cd tests/m16
+make
+cd ~/mcsos/tests/m16
+make clean host
+cd ../..
+cd ~/mcsos/tests/m16
+make clean all
+cp m16_mcsfs_journal.o ../../build/m16/
+cp nm_undefined.txt readelf_header.txt objdump_disasm.txt sha256sum.txt ../../evidence/m16/
+cd ../..
+ls -lh build/m16
+ls -lh evidence/m16
+make clean
+make all 2>&1 | tee logs/m16/build_kernel.log
+qemu-system-x86_64   -machine q35   -m 512M   -serial file:logs/m16/qemu_serial.log   -display none   -no-reboot   -no-shutdown   -cdrom build/mcsos.iso
+cd ~/mcsos
+make iso 2>&1 | tee -a logs/m16/build_kernel.log
+ls -lh build/mcsos.iso
+qemu-system-x86_64   -machine q35   -m 512M   -serial file:logs/m16/qemu_serial.log   -display none   -no-reboot   -no-shutdown   -cdrom build/mcsos.iso
+ls -lh logs/m16/qemu_serial.log
+cat logs/m16/qemu_serial.log
+cd ~/mcsos
+git remote -v
+git status
+git log --oneline -5
+git branch -vv
+git status --short
+find kernel/fs evidence logs scripts tests/m16 -maxdepth 3 -type f 2>/dev/null
+cat kmain.c
+cat makefile   # atau Makefile, yang dipakai buat `make clean iso`
+cat kernel/fs/mcsfs1j/m16_mcsfs_journal.c | head -40
+grep -n "MCSOS_M16_HOST_TEST\|^int \|^void " kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+mkdir -p include/mcsos
+cat > include/mcsos/mcsfs1j.h <<'EOF'
+#ifndef MCSOS_MCSFS1J_H
+#define MCSOS_MCSFS1J_H
+
+#include <stdint.h>
+#include <stddef.h>
+
+#define M16_BLOCK_SIZE 512u
+#define M16_MAX_BLOCKS 128u
+#define M16_MAX_INODES 16u
+#define M16_DIRECT_BLOCKS 4u
+#define M16_MAX_NAME 32u
+
+#define M16_E_OK 0
+#define M16_E_INVAL -1
+#define M16_E_IO -2
+#define M16_E_NOSPC -3
+#define M16_E_EXISTS -4
+#define M16_E_NOENT -5
+#define M16_E_CORRUPT -6
+#define M16_E_TOOLONG -7
+
+struct m16_blockdev {
+    uint8_t blocks[M16_MAX_BLOCKS][M16_BLOCK_SIZE];
+    uint32_t total_blocks;
+    uint64_t writes;
+    int fail_after;
+};
+
+struct m16_super {
+    uint64_t magic;
+    uint32_t version;
+    uint32_t block_size;
+    uint32_t total_blocks;
+    uint32_t journal_start;
+    uint32_t journal_blocks;
+    uint32_t inode_bitmap_lba;
+    uint32_t block_bitmap_lba;
+    uint32_t inode_table_lba;
+    uint32_t inode_table_blocks;
+    uint32_t root_dir_lba;
+    uint32_t data_start_lba;
+    uint32_t clean_generation;
+    uint32_t reserved[114];
+};
+
+void m16_dev_init(struct m16_blockdev *dev);
+int m16_format(struct m16_blockdev *dev);
+int m16_mount(struct m16_blockdev *dev, struct m16_super *sb);
+int m16_journal_recover(struct m16_blockdev *dev);
+int m16_write_file(struct m16_blockdev *dev, const char *name, const uint8_t *data, uint32_t size);
+int m16_write_file_ex(struct m16_blockdev *dev, const char *name, const uint8_t *data, uint32_t size, int stop_after_commit_record);
+int m16_read_file(struct m16_blockdev *dev, const char *name, uint8_t *out, uint32_t out_cap, uint32_t *out_size);
+int m16_fsck(struct m16_blockdev *dev);
+
+#endif /* MCSOS_MCSFS1J_H */
+EOF
+
+cat > kernel/fs/mcsfs1j/m16_demo.c <<'EOF'
+#include "mcsos/mcsfs1j.h"
+
+extern void serial_write_string(char *str);
+
+static struct m16_blockdev g_m16_dev;
+
+static void m16_log_rc(const char *label, int rc) {
+    serial_write_string("[M16] ");
+    serial_write_string((char *)label);
+    if (rc == M16_E_OK) {
+        serial_write_string(" OK\n");
+    } else {
+        serial_write_string(" FAILED\n");
+    }
+}
+
+void m16_demo_run(void) {
+    static const uint8_t hello[] = { 'h', 'e', 'l', 'l', 'o', '-', 'm', '1', '6' };
+    static const uint8_t crashy[] = { 'c', 'r', 'a', 's', 'h', '-', 'r', 'e', 'p', 'l', 'a', 'y' };
+    uint8_t out[64];
+    uint32_t out_size = 0;
+    int rc;
+
+    serial_write_string("[M16] filesystem journal init...\n");
+
+    m16_dev_init(&g_m16_dev);
+
+    rc = m16_format(&g_m16_dev);
+    m16_log_rc("format", rc);
+    if (rc != M16_E_OK) {
+        return;
+    }
+
+    rc = m16_fsck(&g_m16_dev);
+    m16_log_rc("fsck after format", rc);
+
+    rc = m16_write_file(&g_m16_dev, "hello.txt", hello, (uint32_t)sizeof(hello));
+    m16_log_rc("write hello.txt", rc);
+
+    rc = m16_read_file(&g_m16_dev, "hello.txt", out, sizeof(out), &out_size);
+    m16_log_rc("read hello.txt", rc);
+
+    rc = m16_write_file_ex(&g_m16_dev, "crash.txt", crashy, (uint32_t)sizeof(crashy), 1);
+    m16_log_rc("write crash.txt (simulated power loss)", rc);
+
+    rc = m16_journal_recover(&g_m16_dev);
+    m16_log_rc("journal replay after crash", rc);
+
+    rc = m16_read_file(&g_m16_dev, "crash.txt", out, sizeof(out), &out_size);
+    m16_log_rc("read crash.txt after replay", rc);
+
+    rc = m16_fsck(&g_m16_dev);
+    m16_log_rc("fsck after replay", rc);
+
+    serial_write_string("[M16] filesystem journal init complete\n");
+}
+EOF
+
+nano scripts/m16_qemu_smoke_test.sh
+chmod +x scripts/m16_qemu_smoke_test.sh
+./scripts/m16_qemu_smoke_test.sh
+cat Makefile
+grep -n -i "iso\|grub-mkrescue\|xorriso" Makefile
+grep -n "^[a-zA-Z_-]*:" Makefile
+find . -iname "makefile*" -not -path "*/build/*"
+cat makefile
+grep -n -i "iso\|grub-mkrescue\|xorriso\|^[a-zA-Z_-]*:" makefile
+cat tests/m16/Makefile
+nano scripts/m16_qemu_smoke_test.sh
+which grub-mkrescue
+./scripts/m16_qemu_smoke_test.sh
+cat logs/m16/qemu_serial.log
+qemu-system-x86_64 -machine q35 -m 512M -nographic -no-reboot -cdrom build/mcsos.iso
+cd ~/mcsos
+cat fs/mcsfs1/mcsfs1.c
+nano tests/m15/test_mcsfs1_fault.c
+nano makefile
+make -n m15-fault
+make m15-fault
+cd ~/mcsos
+git add -A
+git commit -m "M15: add mcsfs1 filesystem, fault injection tests, makefile targets"
+git tag m15-final
+cat .gitignore
+echo "backup/" >> .gitignore
+echo "mcsos_final/" >> .gitignore
+git add .gitignore
+git commit -m "chore: ignore backup folders"
+cd ~/mcsos
+nano .gitignore
+git rm -r --cached backup/
+git rm -r --cached mcsos_final/
+git rm --cached makefile.bak
+git rm --cached makefile.m14.bak
+git add .gitignore
+git commit -m "chore: untrack backup folders, add to .gitignore"
+git status
+git log --oneline -5
+cat kernel/fs/mcsfs1j/m16_mcsfs_journal.c
+find . -iname "*.h" -path "*mcsfs1j*"
+cat kmain.c
+cat include/mcsos/mcsfs1j.h
+cat makefile
+sed -i '/mcsfs1_blkdev_adapter\.c -o \$(BUILD_DIR)\/mcsfs1_blkdev_adapter\.o/a\	$(CC) $(CFLAGS) -c kernel/fs/mcsfs1j/m16_mcsfs_journal.c -o $(BUILD_DIR)/m16_mcsfs_journal.o' makefile
+sed -i 's|\$(BUILD_DIR)/mcsfs1_blkdev_adapter\.o$|$(BUILD_DIR)/mcsfs1_blkdev_adapter.o $(BUILD_DIR)/m16_mcsfs_journal.o|' makefile
+grep -n "m16_mcsfs_journal" makefile
+cat > kmain.c << 'EOF'
+#include "fs/mcsfs1/mcsfs1_blkdev_adapter.h"
+#include "mcsos/mcsfs1j.h"
+
+void serial_write_string(char* str) {
+    for (int i = 0; str[i] != '\0'; i++) {
+        __asm__ volatile ("outb %0, %1" : : "a"(str[i]), "Nd"((unsigned short)0x3F8));
+    }
+}
+
+extern void block_demo_run(void);
+extern mcsos_blk_device_t *block_demo_get_dev(void);
+
+static struct m16_blockdev m16_dev;
+static struct m16_super m16_sb;
+
+void kmain() {
+    serial_write_string("Halo Safira, Kernel M6 berhasil jalan!\n");
+    block_demo_run();
+
+    mcsos_blk_device_t *dev = block_demo_get_dev();
+    struct mcsfs1_blkdev fsdev;
+    mcsfs1_adapter_init(&fsdev, dev);
+
+    int rc = mcsfs1_format(&fsdev);
+    if (rc != MCSFS1_ERR_OK) {
+        serial_write_string("[M15] mcsfs1_format FAILED\n");
+        while(1);
+    }
+    serial_write_string("[M15] mcsfs1_format OK\n");
+
+    struct mcsfs1_mount mnt;
+    rc = mcsfs1_mount(&mnt, &fsdev);
+    if (rc != MCSFS1_ERR_OK) {
+        serial_write_string("[M15] mcsfs1_mount FAILED\n");
+        while(1);
+    }
+    serial_write_string("M15: mcsfs1 mounted, boot log reached\n");
+
+    /* M16: mcsfs1j crash-consistency journal subsystem */
+    serial_write_string("[M16] mcsfs1j subsystem init\n");
+    m16_dev_init(&m16_dev);
+
+    int m16_rc = m16_format(&m16_dev);
+    if (m16_rc != M16_E_OK) {
+        serial_write_string("[M16] m16_format FAILED\n");
+        while(1);
+    }
+    serial_write_string("[M16] m16_format OK\n");
+
+    m16_rc = m16_mount(&m16_dev, &m16_sb);
+    if (m16_rc != M16_E_OK) {
+        serial_write_string("[M16] m16_mount FAILED (journal replay error)\n");
+        while(1);
+    }
+    serial_write_string("[M16] mcsfs1j mounted, journal replay (m16_journal_recover) OK\n");
+
+    m16_rc = m16_fsck(&m16_dev);
+    if (m16_rc != M16_E_OK) {
+        serial_write_string("[M16] m16_fsck FAILED\n");
+        while(1);
+    }
+    serial_write_string("[M16] m16_fsck PASS\n");
+
+    serial_write_string("M16: boot path smoke test complete\n");
+
+    while(1);
+}
+EOF
+
+./scripts/m16_qemu_smoke_test.sh
+sed -i '27s| \$(BUILD_DIR)/m16_mcsfs_journal\.o$||' makefile
+grep -n "m16_mcsfs_journal" makefile
+cat kmain.c
+./scripts/m16_qemu_smoke_test.sh
+cat logs/m16/qemu_serial.log
+grep -n "signal=KILL\|timeout -k" scripts/m16_qemu_smoke_test.sh
+sed -i 's/timeout --signal=KILL/timeout -k 5/' scripts/m16_qemu_smoke_test.sh
+grep -n "timeout -k" scripts/m16_qemu_smoke_test.sh
+./scripts/m16_qemu_smoke_test.sh
+cat logs/m16/qemu_serial.log
+./scripts/m16_qemu_smoke_test.sh
+qemu-system-x86_64 -machine q35 -m 512M -nographic -no-reboot -cdrom build/mcsos.iso
+cd ~/mcsos
+pkill qemu-system-x86_64 2>/dev/null; echo "cleared"
+./scripts/m16_qemu_smoke_test.sh
+cat logs/m16/qemu_serial.log
+./scripts/m16_qemu_smoke_test.sh
+qemu-system-x86_64 -machine q35 -m 512M -nographic -no-reboot -cdrom build/mcsos.iso
+cd ~/mcsos
+qemu-system-x86_64   -machine q35   -m 512M   -serial file:logs/m16/qemu_serial.log   -display none   -no-reboot   -no-shutdown   -cdrom build/mcsos.iso

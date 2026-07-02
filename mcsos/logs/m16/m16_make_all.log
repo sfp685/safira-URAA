@@ -1,0 +1,27 @@
+make: Entering directory '/home/user/mcsos/tests/m16'
+rm -f m16_host_test \
+      m16_mcsfs_journal.o \
+      nm_undefined.txt \
+      readelf_header.txt \
+      objdump_disasm.txt \
+      sha256sum.txt
+clang -std=c17 -Wall -Wextra -Werror -O2 -DMCSOS_M16_HOST_TEST ../../kernel/fs/mcsfs1j/m16_mcsfs_journal.c -o m16_host_test
+./m16_host_test
+M16 host tests PASS
+clang -std=c17 -Wall -Wextra -Werror -O2 \
+	-ffreestanding \
+	-fno-builtin \
+	-fno-stack-protector \
+	-fno-pic \
+	-mno-red-zone \
+	-target x86_64-elf \
+	-c ../../kernel/fs/mcsfs1j/m16_mcsfs_journal.c \
+	-o m16_mcsfs_journal.o
+nm -u m16_mcsfs_journal.o > nm_undefined.txt
+readelf -h m16_mcsfs_journal.o > readelf_header.txt
+objdump -dr m16_mcsfs_journal.o > objdump_disasm.txt
+sha256sum m16_mcsfs_journal.o > sha256sum.txt
+test ! -s nm_undefined.txt
+grep -q 'ELF64' readelf_header.txt
+grep -q 'Advanced Micro Devices X86-64' readelf_header.txt
+make: Leaving directory '/home/user/mcsos/tests/m16'

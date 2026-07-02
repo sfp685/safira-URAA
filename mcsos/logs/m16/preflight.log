@@ -1,5 +1,5 @@
 == M16 preflight ==
-2026-07-01T19:35:27+07:00
+2026-07-02T13:46:09+07:00
 == host ==
 Linux DESKTOP-9H6BVAA 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
 Distributor ID:	Ubuntu
@@ -15,9 +15,12 @@ GNU objdump (GNU Binutils for Ubuntu) 2.42
 sha256sum (GNU coreutils) 9.4
 QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.17)
 == git ==
-?? logs/
-?? scripts/m16_preflight.sh
-62f36d6
+ M ../.bash_history
+ M logs/m16/preflight.log
+?? ../.landscape/
+?? scripts/m16_qemu_smoke_test.sh
+?? tests/m16/m16_host_test
+8425b50
 == subsystem probes ==
 kernel/arch/x86_64/idt.c
 kernel/arch/x86_64/isr.S
@@ -26,6 +29,8 @@ kernel/block/block.c
 kernel/block/block_demo.c
 kernel/block/ramblk.c
 kernel/core/trap.c
+kernel/fs/mcsfs1j/m16_demo.c
+kernel/fs/mcsfs1j/m16_mcsfs_journal.c
 kernel/kmain.c
 kernel/mcsos/arch/idt.h
 kernel/mcsos/arch/isr.h
